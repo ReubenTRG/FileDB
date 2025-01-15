@@ -260,3 +260,19 @@ string parse_USE(const string& sql) {
     return use_data;
 }
 
+struct_drop parse_DROP(const string& sql) {
+    struct_drop drop_data = {false, ""};
+
+    regex drop_regex(R"(DROP\s+(TABLE|DATABASE)\s+(\w+))", regex_constants::icase);
+
+    smatch match;
+
+    if (regex_search(sql, match, drop_regex)) {
+        drop_data.is_database = (match[1].str() == "DATABASE");
+        drop_data.name = match[2].str();
+    } else {
+        cerr << "Error: Invalid DROP statement syntax." << endl;
+    }
+
+    return drop_data;
+}

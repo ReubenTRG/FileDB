@@ -39,6 +39,11 @@ struct struct_delete {
     string condition_value;
 };
 
+struct struct_drop {
+    bool is_database;
+    string name;
+};
+
 extern const int commands_count;
 extern const string commands_list[];
 
@@ -60,5 +65,7 @@ struct_update parse_UPDATE(const string& sql);
 struct_delete parse_DELETE(const string& sql);
 
 string parse_USE(const string& sql);
+
+struct_drop parse_DROP(const string& sql);
 
 #endif

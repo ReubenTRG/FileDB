@@ -19,6 +19,7 @@ int main() {
     // string sql = "UPDATE Students SET age = 20 WHERE name == 'John Doe';";
     // string sql = "DELETE FROM Students WHERE age < 18;";
     // string sql = "USE stud;";
+    string sql = "DROP DATABASE School;";
 
 
     string trimmed = trimming(sql);
@@ -32,6 +33,7 @@ int main() {
     struct_update update_data;
     struct_delete delete_data;
     string use_data;
+    struct_drop drop_data;
 
     cout << "Original: " << sql << endl;
     cout << "Trimmed: " << trimmed << endl;
@@ -77,7 +79,7 @@ int main() {
             }
             cout << endl;
             cout << "Table: " << table << endl;
-            cout << "Condition Details(Column Condition Value): " << cond.column << " ~ " << cond.oper << " " << cond.value << endl;
+            cout << "Condition Details(Column Condition Value): " << cond.column << " " << cond.oper << " " << cond.value << endl;
             break;
 
         case 3:
@@ -117,6 +119,13 @@ int main() {
             use_data = parse_USE(sql);
 
             cout << "Database: " << use_data << endl;
+            break;
+
+        case 6:
+            // Drop Code
+            drop_data = parse_DROP(sql);
+
+            cout << "Dropping: " << (drop_data.is_database ? "Database" : "Table") << " " << drop_data.name << endl;
             break;
         
         default:
