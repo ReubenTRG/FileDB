@@ -1,15 +1,18 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "HEADERS/reader.h"
+
+#include "HEADERS/parser.h"
+#include "HEADERS/logic.h"
 
 using namespace std;
 
-// to compile: g++ test.cpp HEADERS/reader.cpp -o test
+// to compile: g++ test.cpp HEADERS/parser.cpp HEADERS/logic.cpp src/file_handler.cpp -o test; ./test
 
 int main() {
     // string sql = "   SELECT name, dept, age FROM Class WHERE age >= 12;   ";
-    // string sql = "CREATE TABLE Students (id INT, name VARCHAR(50), age INT);";
+    // string sql = "CREATE DATABASE School;";
+    string sql = "CREATE TABLE Students (id INT, name STRING, age INT);";
     // string sql = "CREATE DATABASE School;";
     // string sql = "SELECT name, age FROM Students WHERE age >= 18;";
     // string sql = "UPDATE Students SET age = 21 WHERE name = 'John Doe';";
@@ -17,13 +20,15 @@ int main() {
     // string sql = "CREATE TABLE Students (id INT, name VARCHAR, age INT);";
     // string sql = "INSERT INTO Students VALUES (101, 'John Doe', 22);";
     // string sql = "UPDATE Students SET age = 20 WHERE name == 'John Doe';";
-    // string sql = "DELETE FROM Students WHERE age < 18;";
+    // string sql = "DELETE FROM Students WHERE age < 18;"; 
     // string sql = "USE stud;";
-    string sql = "DROP DATABASE School;";
+    // string sql = "DROP DATABASE School;";
 
 
     string trimmed = trimming(sql);
     int command_id = parse_command(trimmed);
+
+    string curr_database = "School";
 
     vector<string> columns;
     string table, option, name;
@@ -53,6 +58,14 @@ int main() {
                 cout << col.name << " ~> " << col.type << " ";
             }
             cout << endl;
+
+            if (option == "TABLE") {
+                createTable(name, curr_database, column_datatype);
+            } else if (option == "DATABASE") {
+                createDatabase(name);
+                curr_database = name;
+            }
+
             break;
 
         case 1:

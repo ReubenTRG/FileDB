@@ -3,7 +3,7 @@
 #include <vector>
 #include <regex>
 #include <algorithm>
-#include "reader.h"
+#include "parser.h"
 
 using namespace std;
 
@@ -121,7 +121,7 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
     vector<struct_column_datatype> columns;
 
     // Regex to match columns within the CREATE TABLE statement
-    regex column_regex(R"(CREATE\s+TABLE\s+\w+\s*\((.+?)\))", regex_constants::icase);
+    regex column_regex(R"(CREATE\s+TABLE\s+\w+\s*\((.+?)\);)", regex_constants::icase);
     smatch match;
 
     if (regex_search(sql, match, column_regex)) {
@@ -141,6 +141,7 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
                 struct_column_datatype col;
                 col.name = column_match[1].str(); // Extract column name
                 col.type = column_match[2].str(); // Extract data type
+                cout << "Column name: " << col.name << ", Type: " << col.type << endl;
                 columns.push_back(col);
             }
         }
