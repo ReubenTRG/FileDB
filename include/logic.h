@@ -9,7 +9,13 @@
 
 using namespace std;
 
-const std::map<string, int, int> table_schema_datatype = {
+struct DataType {
+	string name;
+	int code;
+	int size;
+};
+
+const vector<DataType> table_schema_datatype = {
 	{"INT", 0x0, 0x4},
 	{"FLOAT", 0x1, 0x8},
 	{"CHAR", 0x2, 0x1},

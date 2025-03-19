@@ -3,7 +3,7 @@
 #include <vector>
 #include <regex>
 #include <algorithm>
-#include "parser.h"
+#include "../include/parser.h"
 
 using namespace std;
 

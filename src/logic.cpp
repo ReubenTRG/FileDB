@@ -1,5 +1,5 @@
-#include "parser.h"
-#include "logic.h"
+#include "../include/parser.h"
+#include "../include/logic.h"
 #include "../include/file_handler.h"
 
 #include <iostream>

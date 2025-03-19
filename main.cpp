@@ -1,7 +1,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "HEADERS/parser.h"
+
+#include "../include/parser.h"
+#include "../include/logic.h"
 
 using namespace std;
 

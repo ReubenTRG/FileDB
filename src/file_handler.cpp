@@ -1,5 +1,5 @@
 #include "../include/file_handler.h"
-#include "logic.h"
+#include "../include/logic.h"
 
 #include <iostream>
 #include <fstream>
@@ -158,7 +158,60 @@ void updateTableName(fstream &file, const string& old_name, const string& new_na
     file.write(reinterpret_cast<const char*>(new_name_arr), BIT8_MAX);
 }
 
+void deleteTablePointer(fstream &file, const string& table_name) {
+    uint8_t table_count = readPointersCount(file);
+    uint8_t index = findTableIndex(file, table_name);
+    if (index == 255) {
+        cerr << "Error: Table not found." << endl;
+        return;
+    }
+    if (index != table_count - 1) {
+        auto [last_name, last_ptr] = readPointers(file, table_count - 1);
+        file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
+        uint8_t last_name_arr[BIT8_MAX] = {0};
+        strncpy(reinterpret_cast<char*>(last_name_arr), last_name.c_str(), sizeof(last_name_arr));
+        file.write(reinterpret_cast<const char*>(last_name_arr), BIT8_MAX);
+        file.write(reinterpret_cast<const char*>(&last_ptr), POINTER_SIZE);
+    }
+    updatePointersCount(file, table_count - 1);
+}
 
+void createTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& columns) {
+    file.seekp(table_ptr, ios::beg);
+    uint8_t num_columns = columns.size();
+    file.write(reinterpret_cast<const char*>(&num_columns), sizeof(num_columns));
+    for (const auto& [col_name, dtype] : columns) {
+        uint8_t col_name_arr[256] = {0};
+        strncpy(reinterpret_cast<char*>(col_name_arr), col_name.c_str(), sizeof(col_name_arr));
+        file.write(reinterpret_cast<const char*>(col_name_arr), 256);
+        file.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+    }
+}
+
+vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr) {
+    file.seekg(table_ptr, ios::beg);
+    uint8_t num_columns;
+    file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
+    vector<pair<string, uint8_t>> columns;
+    for (uint8_t i = 0; i < num_columns; i++) {
+        char col_name[256] = {0};
+        file.read(col_name, 256);
+        uint8_t dtype;
+        file.read(reinterpret_cast<char*>(&dtype), sizeof(dtype));
+        columns.emplace_back(string(col_name), dtype);
+    }
+    return columns;
+}
+
+void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& new_columns) {
+    createTableSchema(file, table_ptr, new_columns);
+}
+
+void deleteTableSchema(fstream &file, uint32_t table_ptr) {
+    file.seekp(table_ptr, ios::beg);
+    uint8_t zero = 0;
+    file.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
+}
 
 
 

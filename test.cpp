@@ -2,14 +2,15 @@
 #include <string>
 #include <vector>
 
-#include "HEADERS/parser.h"
-#include "HEADERS/logic.h"
+#include "./include/parser.h"
+#include "./include/logic.h"
 
 using namespace std;
 
 // to compile: g++ test.cpp HEADERS/parser.cpp HEADERS/logic.cpp src/file_handler.cpp -o test; ./test
 
 int main() {
+    
     // string sql = "   SELECT name, dept, age FROM Class WHERE age >= 12;   ";
     // string sql = "CREATE DATABASE School;";
     string sql = "CREATE TABLE Students (id INT, name STRING, age INT);";
