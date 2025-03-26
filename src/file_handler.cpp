@@ -36,28 +36,28 @@ void createDatabaseName(fstream &file, const string& name) {
 	file.write(reinterpret_cast<char *>(databaseName), sizeof(databaseName));
 }
 
-// read the database name from the file
-string readDatabaseName(fstream &file, string& name) {
-	file.seekg(0, ios::beg);
-	uint8_t databaseName[BIT8_MAX] = {0};
-	file.read(reinterpret_cast<char *>(databaseName), sizeof(databaseName));
-	return reinterpret_cast<char *>(databaseName);
-}
+// // read the database name from the file
+// string readDatabaseName(fstream &file, string& name) {
+// 	file.seekg(0, ios::beg);
+// 	uint8_t databaseName[BIT8_MAX] = {0};
+// 	file.read(reinterpret_cast<char *>(databaseName), sizeof(databaseName));
+// 	return reinterpret_cast<char *>(databaseName);
+// }
 
-// update the database name in the file
-string updateDatabaseName(fstream &file, string& name) {
-	file.seekg(0, ios::beg);
-	uint8_t oldDatabaseName[BIT8_MAX] = {0};
-	file.read(reinterpret_cast<char *>(oldDatabaseName), sizeof(oldDatabaseName));
+// // update the database name in the file
+// string updateDatabaseName(fstream &file, string& name) {
+// 	file.seekg(0, ios::beg);
+// 	uint8_t oldDatabaseName[BIT8_MAX] = {0};
+// 	file.read(reinterpret_cast<char *>(oldDatabaseName), sizeof(oldDatabaseName));
 
-	uint8_t newDatabaseName[BIT8_MAX] = {0};
-	strncpy(reinterpret_cast<char *>(newDatabaseName), name.c_str(), sizeof(newDatabaseName));
-	file.write(reinterpret_cast<char *>(newDatabaseName), sizeof(newDatabaseName));
+// 	uint8_t newDatabaseName[BIT8_MAX] = {0};
+// 	strncpy(reinterpret_cast<char *>(newDatabaseName), name.c_str(), sizeof(newDatabaseName));
+// 	file.write(reinterpret_cast<char *>(newDatabaseName), sizeof(newDatabaseName));
 
-	return reinterpret_cast<char *>(oldDatabaseName);
-}
+// 	return reinterpret_cast<char *>(oldDatabaseName);
+// }
 
-// create pointers in the file
+// // create pointers in the file
 void createPointersCount(fstream &file) {
 	file.seekg(BIT8_MAX + 1, ios::beg);
 	uint8_t table_count = 0;
@@ -77,10 +77,12 @@ uint8_t updatePointersCount(fstream &file, uint8_t table_count) {
 	return table_count;
 }
 
-void createPointers(fstream &file, uint8_t table_count) {
+void createPointers(fstream &file) {
 	file.seekg(BIT8_MAX + 2, ios::beg);
-	for (uint8_t i = 0; i < BIT8_MAX; i++) {
-		uint8_t table_pointer[BIT8_MAX] = {0};
+	uint8_t table_name[BIT8_MAX] = {0};
+	uint8_t table_pointer[POINTER_SIZE] = {0};
+	for (int i = 0; i < BIT8_MAX; i++) {
+		file.write(reinterpret_cast<char *>(&table_name), sizeof(table_name));
 		file.write(reinterpret_cast<char *>(&table_pointer), sizeof(table_pointer));
 	}
 }
@@ -94,19 +96,19 @@ pair<string, int> readPointers(fstream &file, uint8_t table_count) {
 	return make_pair(reinterpret_cast<char *>(table_name), reinterpret_cast<int>(table_pointer));
 }
 
-uint32_t findTablePointers(fstream &file, const string& table_find_name) {
-	uint8_t table_count = readPointersCount(file);
-	uint32_t table_find_pointer = 0;
-	bool found = false;
-	for (uint8_t i = 0; i < table_count; i++) {
-		auto [table_name, table_pointer] = readPointers(file, i);
-		if (table_name == table_find_name) {
-			table_find_pointer = table_pointer;
-			break;
-		}
-	}
-	return (found == true)? table_find_pointer: 0;
-}
+// uint32_t findTablePointers(fstream &file, const string& table_find_name) {
+// 	uint8_t table_count = readPointersCount(file);
+// 	uint32_t table_find_pointer = 0;
+// 	bool found = false;
+// 	for (uint8_t i = 0; i < table_count; i++) {
+// 		auto [table_name, table_pointer] = readPointers(file, i);
+// 		if (table_name == table_find_name) {
+// 			table_find_pointer = table_pointer;
+// 			break;
+// 		}
+// 	}
+// 	return (found == true)? table_find_pointer: 0;
+// }
 
 uint8_t findTableIndex(fstream &file, const string& table_name) {
     uint8_t table_count = readPointersCount(file);
@@ -136,82 +138,82 @@ void insertTablePointer(fstream &file, const string& table_name, uint32_t table_
     updatePointersCount(file, table_count + 1);
 }
 
-void updateTablePointer(fstream &file, const string& table_name, uint32_t new_ptr) {
-    uint8_t index = findTableIndex(file, table_name);
-    if (index == 255) {
-        cerr << "Error: Table not found." << endl;
-        return;
-    }
-    file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index + BIT8_MAX, ios::beg);
-    file.write(reinterpret_cast<const char*>(&new_ptr), POINTER_SIZE);
-}
+// void updateTablePointer(fstream &file, const string& table_name, uint32_t new_ptr) {
+//     uint8_t index = findTableIndex(file, table_name);
+//     if (index == 255) {
+//         cerr << "Error: Table not found." << endl;
+//         return;
+//     }
+//     file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index + BIT8_MAX, ios::beg);
+//     file.write(reinterpret_cast<const char*>(&new_ptr), POINTER_SIZE);
+// }
 
-void updateTableName(fstream &file, const string& old_name, const string& new_name) {
-    uint8_t index = findTableIndex(file, old_name);
-    if (index == 255) {
-        cerr << "Error: Table not found." << endl;
-        return;
-    }
-    file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
-    uint8_t new_name_arr[BIT8_MAX] = {0};
-    strncpy(reinterpret_cast<char*>(new_name_arr), new_name.c_str(), sizeof(new_name_arr));
-    file.write(reinterpret_cast<const char*>(new_name_arr), BIT8_MAX);
-}
+// void updateTableName(fstream &file, const string& old_name, const string& new_name) {
+//     uint8_t index = findTableIndex(file, old_name);
+//     if (index == 255) {
+//         cerr << "Error: Table not found." << endl;
+//         return;
+//     }
+//     file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
+//     uint8_t new_name_arr[BIT8_MAX] = {0};
+//     strncpy(reinterpret_cast<char*>(new_name_arr), new_name.c_str(), sizeof(new_name_arr));
+//     file.write(reinterpret_cast<const char*>(new_name_arr), BIT8_MAX);
+// }
 
-void deleteTablePointer(fstream &file, const string& table_name) {
-    uint8_t table_count = readPointersCount(file);
-    uint8_t index = findTableIndex(file, table_name);
-    if (index == 255) {
-        cerr << "Error: Table not found." << endl;
-        return;
-    }
-    if (index != table_count - 1) {
-        auto [last_name, last_ptr] = readPointers(file, table_count - 1);
-        file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
-        uint8_t last_name_arr[BIT8_MAX] = {0};
-        strncpy(reinterpret_cast<char*>(last_name_arr), last_name.c_str(), sizeof(last_name_arr));
-        file.write(reinterpret_cast<const char*>(last_name_arr), BIT8_MAX);
-        file.write(reinterpret_cast<const char*>(&last_ptr), POINTER_SIZE);
-    }
-    updatePointersCount(file, table_count - 1);
-}
+// void deleteTablePointer(fstream &file, const string& table_name) {
+//     uint8_t table_count = readPointersCount(file);
+//     uint8_t index = findTableIndex(file, table_name);
+//     if (index == 255) {
+//         cerr << "Error: Table not found." << endl;
+//         return;
+//     }
+//     if (index != table_count - 1) {
+//         auto [last_name, last_ptr] = readPointers(file, table_count - 1);
+//         file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
+//         uint8_t last_name_arr[BIT8_MAX] = {0};
+//         strncpy(reinterpret_cast<char*>(last_name_arr), last_name.c_str(), sizeof(last_name_arr));
+//         file.write(reinterpret_cast<const char*>(last_name_arr), BIT8_MAX);
+//         file.write(reinterpret_cast<const char*>(&last_ptr), POINTER_SIZE);
+//     }
+//     updatePointersCount(file, table_count - 1);
+// }
 
-void createTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& columns) {
-    file.seekp(table_ptr, ios::beg);
-    uint8_t num_columns = columns.size();
-    file.write(reinterpret_cast<const char*>(&num_columns), sizeof(num_columns));
-    for (const auto& [col_name, dtype] : columns) {
-        uint8_t col_name_arr[256] = {0};
-        strncpy(reinterpret_cast<char*>(col_name_arr), col_name.c_str(), sizeof(col_name_arr));
-        file.write(reinterpret_cast<const char*>(col_name_arr), 256);
-        file.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
-    }
-}
+// void createTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& columns) {
+//     file.seekp(table_ptr, ios::beg);
+//     uint8_t num_columns = columns.size();
+//     file.write(reinterpret_cast<const char*>(&num_columns), sizeof(num_columns));
+//     for (const auto& [col_name, dtype] : columns) {
+//         uint8_t col_name_arr[256] = {0};
+//         strncpy(reinterpret_cast<char*>(col_name_arr), col_name.c_str(), sizeof(col_name_arr));
+//         file.write(reinterpret_cast<const char*>(col_name_arr), 256);
+//         file.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+//     }
+// }
 
-vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr) {
-    file.seekg(table_ptr, ios::beg);
-    uint8_t num_columns;
-    file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
-    vector<pair<string, uint8_t>> columns;
-    for (uint8_t i = 0; i < num_columns; i++) {
-        char col_name[256] = {0};
-        file.read(col_name, 256);
-        uint8_t dtype;
-        file.read(reinterpret_cast<char*>(&dtype), sizeof(dtype));
-        columns.emplace_back(string(col_name), dtype);
-    }
-    return columns;
-}
+// vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr) {
+//     file.seekg(table_ptr, ios::beg);
+//     uint8_t num_columns;
+//     file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
+//     vector<pair<string, uint8_t>> columns;
+//     for (uint8_t i = 0; i < num_columns; i++) {
+//         char col_name[256] = {0};
+//         file.read(col_name, 256);
+//         uint8_t dtype;
+//         file.read(reinterpret_cast<char*>(&dtype), sizeof(dtype));
+//         columns.emplace_back(string(col_name), dtype);
+//     }
+//     return columns;
+// }
 
-void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& new_columns) {
-    createTableSchema(file, table_ptr, new_columns);
-}
+// void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& new_columns) {
+//     createTableSchema(file, table_ptr, new_columns);
+// }
 
-void deleteTableSchema(fstream &file, uint32_t table_ptr) {
-    file.seekp(table_ptr, ios::beg);
-    uint8_t zero = 0;
-    file.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
-}
+// void deleteTableSchema(fstream &file, uint32_t table_ptr) {
+//     file.seekp(table_ptr, ios::beg);
+//     uint8_t zero = 0;
+//     file.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
+// }
 
 
 
@@ -262,17 +264,17 @@ int createEmptyFile(const string& name) {
 
 
 
-int tableCount(fstream &file, int database_name_length) {
-	uint8_t table_count;
-	file.seekg(database_name_length + 1, ios::beg);
-	file.read(reinterpret_cast<char*>(&table_count), sizeof(uint8_t));
-	if (table_count == BIT8_MAX) {
-		cerr << "Error: No tables found in the database." << endl;
-		return -1;
-	} else {
-		return table_count;
-	}
-}
+// int tableCount(fstream &file, int database_name_length) {
+// 	uint8_t table_count;
+// 	file.seekg(database_name_length + 1, ios::beg);
+// 	file.read(reinterpret_cast<char*>(&table_count), sizeof(uint8_t));
+// 	if (table_count == BIT8_MAX) {
+// 		cerr << "Error: No tables found in the database." << endl;
+// 		return -1;
+// 	} else {
+// 		return table_count;
+// 	}
+// }
 
 int tableCountIncrement(fstream &file, int curr_offset, int table_count) {
 	uint8_t new_table_count = table_count + 1;

@@ -12,9 +12,8 @@ using namespace std;
 int main() {
     
     // string sql = "   SELECT name, dept, age FROM Class WHERE age >= 12;   ";
-    // string sql = "CREATE DATABASE School;";
-    string sql = "CREATE TABLE Students (id INT, name STRING, age INT);";
-    // string sql = "CREATE DATABASE School;";
+    string sql = "CREATE DATABASE School;";
+    // string sql = "CREATE TABLE Students (id INT, name STRING, age INT);";
     // string sql = "SELECT name, age FROM Students WHERE age >= 18;";
     // string sql = "UPDATE Students SET age = 21 WHERE name = 'John Doe';";
     // string sql = "DELETE FROM Students WHERE age < 18;";
@@ -54,14 +53,15 @@ int main() {
 
             cout << "Option: " << option << endl;
             cout << "Name: " << name << endl;
-            cout << "Columns: ";
-            for (const struct_column_datatype& col : column_datatype) {
-                cout << col.name << " ~> " << col.type << " ";
-            }
-            cout << endl;
+            
 
             if (option == "TABLE") {
-                createTable(name, curr_database, column_datatype);
+                cout << "Columns: ";
+                for (const struct_column_datatype& col : column_datatype) {
+                    cout << col.name << " ~> " << col.type << " ";
+                }
+                cout << endl;
+                // createTable(name, curr_database, column_datatype);
             } else if (option == "DATABASE") {
                 createDatabase(name);
                 curr_database = name;
