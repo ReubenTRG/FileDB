@@ -189,6 +189,13 @@ void createTableSchema(fstream &file, int table_ptr, vector<pair<string, uint8_t
     }
 }
 
+uint8_t readTableSchemaSize(fstream &file, uint32_t table_ptr) {
+    file.seekg(table_ptr, ios::beg);
+    uint8_t num_columns;
+    file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
+    return num_columns;
+}
+
 vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr) {
     file.seekg(table_ptr, ios::beg);
     uint8_t num_columns;
@@ -226,19 +233,111 @@ void createTableData(fstream &file, int table_ptr, int total_schema_bytes) {
 	}
 }
 
-void readTableData(fstream &file, uint32_t table_ptr, vector<vector<string>> &data) {
-    file.seekg(table_ptr, ios::beg);
-    uint8_t num_columns;
-    file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
-    for (uint8_t i = 0; i < num_columns; i++) {
-        vector<string> column_data;
-        for (uint8_t j = 0; j < num_columns; j++) {
-            char value[256] = {0};
-            file.read(value, 256);
-            column_data.push_back(string(value));
+vector<vector<string>> readTableData(fstream &file, int table_offset, const vector<pair<string, uint8_t>> &columns) {
+    vector<vector<string>> table_data;
+    file.seekg(table_offset, ios::beg);
+    
+    for (int i = 0; i < 256; i++) { // Maximum 256 records
+        uint8_t flag;
+        file.read(reinterpret_cast<char*>(&flag), sizeof(uint8_t));
+        if (file.eof()) break;
+        
+        if (flag == 1) { // Valid record
+            vector<string> row;
+            for (const auto& column : columns) {
+                string value;
+                switch (column.second) {
+                    case 0x0: { // INT
+                        int temp;
+                        file.read(reinterpret_cast<char*>(&temp), sizeof(int));
+                        value = to_string(temp);
+                        break;
+                    }
+                    case 0x1: { // FLOAT
+                        float temp;
+                        file.read(reinterpret_cast<char*>(&temp), sizeof(float));
+                        value = to_string(temp);
+                        break;
+                    }
+                    case 0x2: { // CHAR
+                        char temp;
+                        file.read(&temp, sizeof(char));
+                        value = string(1, temp);
+                        break;
+                    }
+                    case 0x3: { // STRING
+                        char temp[255];
+                        file.read(temp, 255);
+                        value = string(temp);
+                        break;
+                    }
+                    case 0x4: { // BOOL
+                        bool temp;
+                        file.read(reinterpret_cast<char*>(&temp), sizeof(bool));
+                        value = temp ? "true" : "false";
+                        break;
+                    }
+                    default:
+                        value = "UNKNOWN";
+                        break;
+                }
+                row.push_back(value);
+            }
+            table_data.push_back(row);
+        } else { // Skip over the record
+            for (const auto& column : columns) {
+                switch (column.second) {
+                    case 0x0: file.seekg(sizeof(int), ios::cur); break;
+                    case 0x1: file.seekg(sizeof(float), ios::cur); break;
+                    case 0x2: file.seekg(sizeof(char), ios::cur); break;
+                    case 0x3: file.seekg(255, ios::cur); break;
+                    case 0x4: file.seekg(sizeof(bool), ios::cur); break;
+                    default: break;
+                }
+            }
         }
-        data.push_back(column_data);
     }
+    return table_data;
+}
 
 
+
+void insertTableData(fstream &file, uint32_t table_ptr, const vector<struct_name_id_data> &data, int total_schema_bytes) {
+    file.seekp(table_ptr, ios::beg);
+
+	uint8_t flag = 0x0;
+	for (int i = 0; i < BIT8_MAX; i++) {
+		file.seekg(table_ptr + (1 + total_schema_bytes) * i, ios::beg);
+		file.read(reinterpret_cast<char*>(&flag), sizeof(flag));
+		if (flag == 0) {
+			break;
+		}
+	}
+
+	uint8_t insert_flag = 0x1;
+	file.write(reinterpret_cast<const char*>(&insert_flag), sizeof(insert_flag));
+	
+    uint8_t num_columns = data.size();
+    for (const auto& val : data) {
+        if (val.id == 0) {
+            int value = val.int_data;
+            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
+        } else if (val.id == 1) {
+            double value = val.float_data;
+            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
+		} else if (val.id == 2) {
+            char value = val.char_data;
+            file.write(reinterpret_cast<const char*>(value), sizeof(value));
+        } else if (val.id == 3) {
+            char value[256] = {0};
+            strncpy(value, val.string_data.c_str(), sizeof(value));
+            file.write(value, strlen(value));  // Write only up to the actual length
+        } else if (val.id == 4) {
+            bool value = val.bool_data;
+            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
+        } else {
+			cout << "Error: Invalid data type." << endl;
+			return;
+		}
+    }
 }

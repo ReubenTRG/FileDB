@@ -6,6 +6,8 @@
 #include <map>
 #include <cstdint>
 
+#include "./global.h"
+
 using namespace std;
 
 // New code
@@ -35,7 +37,8 @@ void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<stri
 void deleteTableSchema(fstream &file, uint32_t table_ptr);
 
 void createTableData(fstream &file, int table_ptr, int total_schema_bytes);
-
+vector<vector<string>> readTableData(fstream &file, int table_offset, const vector<pair<string, uint8_t>> &columns);
+void insertTableData(fstream &file, uint32_t table_ptr, const vector<struct_name_id_data> &data, int total_schema_bytes);
 
 // vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr);
 

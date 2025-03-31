@@ -41,6 +41,50 @@ void read_table_info(fstream &file) {
     }
 }
 
+void read_table_data(fstream &file) {
+    uint8_t table_count = readPointersCount(file);
+    for (uint8_t i = 0; i < table_count; i++) {
+        pair<string, int> table_info = readPointers(file, i);
+        cout << "\nTable " << (int)(i + 1) << " Data:" << endl;
+        
+        vector<pair<string, uint8_t>> table_schema = readTableSchema(file, table_info.second);
+
+        int total_schema_bytes = 0;
+        for (size_t i = 0; i < table_schema.size(); i++) {
+            
+            switch (table_schema[i].second) {
+                case 0x0: // INT
+                    total_schema_bytes += 0x4;
+                    break;
+                case 0x1: // FLOAT
+                    total_schema_bytes += 0x8;
+                    break;
+                case 0x2: // CHAR
+                    total_schema_bytes += 0x1;
+                    break;
+                case 0x3: // STRING
+                    total_schema_bytes += 0xff;
+                    break;
+                case 0x4: // BOOL
+                    total_schema_bytes += 0x1;
+                    break;
+                default:
+                    cerr << "Error: Invalid data type." << endl;
+                    return;
+            }
+        }
+
+        vector<vector<string>> table_data = readTableData(file, table_info.second + total_schema_bytes, table_schema);
+        
+        for (const auto& row : table_data) {
+            for (const auto& value : row) {
+                cout << value << "\t";
+            }
+            cout << endl;
+        }
+    }
+}
+
 int main() {
     fstream file("School.fdb", ios::in | ios::binary);
     if (!file) {
@@ -50,6 +94,7 @@ int main() {
     read_database_info(file);
     read_pointers(file);
     read_table_info(file);
+    read_table_data(file);
     file.close();
     return 0;
 }

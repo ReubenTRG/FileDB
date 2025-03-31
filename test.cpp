@@ -79,6 +79,10 @@ int main() {
                 cout << value << " ~ ";
             }
             cout << endl;
+
+            
+            insertRow(insert_data.table_name, curr_database, insert_data.values);
+
             break;
         
         case 2:

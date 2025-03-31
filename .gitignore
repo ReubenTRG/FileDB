@@ -1,5 +1,6 @@
 .vscode
 test.exe
 main.exe
+dataReader.exe
 cmds.txt
 project_plan.txt
