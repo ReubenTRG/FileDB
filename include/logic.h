@@ -9,13 +9,24 @@
 
 using namespace std;
 
-struct DataType {
+struct struct_dtype_id_size {
 	string name;
 	int code;
 	int size;
 };
 
-const vector<DataType> table_schema_datatype = {
+struct struct_name_dtype_data {
+	string name;
+	int code;
+	
+	int int_data;
+	float float_data;
+	char char_data;
+	string string_data;
+	bool bool_data;
+};
+
+const vector<struct_dtype_id_size> table_schema_datatype = {
 	{"INT", 0x0, 0x4},
 	{"FLOAT", 0x1, 0x8},
 	{"CHAR", 0x2, 0x1},
