@@ -1,7 +1,6 @@
-// to compile: g++ -std=c++20 dataReader.cpp src/file_handler.cpp -o dataReader && ./dataReader
-
-
 #include "./include/file_handler.h"
+#include "./include/global.h"
+
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -17,7 +16,7 @@ void read_database_info(fstream &file) {
 
 void read_pointers(fstream &file) {
     uint8_t table_count = readPointersCount(file);
-
+    
     for (uint8_t i = 0; i < table_count; i++) {
         pair<string, int> table_info = readPointers(file, i);
         cout << "\nTable " << (int)(i + 1) << ": " << table_info.first << ", pointer: " << table_info.second << endl;
@@ -32,11 +31,11 @@ void read_table_info(fstream &file) {
         pair<string, int> table_info = readPointers(file, i);
         cout << "\nTable " << (int)(i + 1) << ": " << table_info.first << endl;
         
-        vector<pair<string, uint8_t>> columns = readTableSchema(file, table_info.second);
+        vector<struct_col_dtype> columns = readTableSchema(file, table_info.second);
         cout << "Columns (" << columns.size() << "):" << endl;
         
         for (const auto& column : columns) {
-            cout << "  - " << column.first << " (" << (int)column.second << ")" << endl;
+            cout << "  - " << column.col_name << " (" << (int)column.id << ")" << endl;
         }
     }
 }
@@ -47,34 +46,10 @@ void read_table_data(fstream &file) {
         pair<string, int> table_info = readPointers(file, i);
         cout << "\nTable " << (int)(i + 1) << " Data:" << endl;
         
-        vector<pair<string, uint8_t>> table_schema = readTableSchema(file, table_info.second);
-
-        int total_schema_bytes = 0;
-        for (size_t i = 0; i < table_schema.size(); i++) {
-            
-            switch (table_schema[i].second) {
-                case 0x0: // INT
-                    total_schema_bytes += 0x4;
-                    break;
-                case 0x1: // FLOAT
-                    total_schema_bytes += 0x8;
-                    break;
-                case 0x2: // CHAR
-                    total_schema_bytes += 0x1;
-                    break;
-                case 0x3: // STRING
-                    total_schema_bytes += 0xff;
-                    break;
-                case 0x4: // BOOL
-                    total_schema_bytes += 0x1;
-                    break;
-                default:
-                    cerr << "Error: Invalid data type." << endl;
-                    return;
-            }
-        }
-
-        vector<vector<string>> table_data = readTableData(file, table_info.second + total_schema_bytes, table_schema);
+        vector<struct_col_dtype> table_schema = readTableSchema(file, table_info.second);
+        int total_schema_bytes = totalSchemaBytes(table_schema);
+        
+        vector<vector<string>> table_data = readTableData(file, table_info.second + 1 + total_schema_bytes, table_schema);
         
         for (const auto& row : table_data) {
             for (const auto& value : row) {
@@ -85,16 +60,20 @@ void read_table_data(fstream &file) {
     }
 }
 
-int main() {
-    fstream file("School.fdb", ios::in | ios::binary);
+int main(int argc, char* argv[]) {
+    string filename = (argc > 1) ? (string(argv[1]) + ".fdb") : "School.fdb";
+    
+    fstream file(filename, ios::in | ios::binary);
     if (!file) {
-        cerr << "Error opening database file." << endl;
+        cerr << "Error opening database file: " << filename << endl;
         return 1;
     }
+    
     read_database_info(file);
     read_pointers(file);
     read_table_info(file);
     read_table_data(file);
+    
     file.close();
     return 0;
 }

@@ -41,4 +41,14 @@ void createTable(const string& name, const string& database_name,  vector<struct
 
 void insertRow(const string& table_name, const string& database_name, vector<string> values);
 
+void deleteRows(const string& database_name, const string& table_name);
+
+void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value);
+
+int useDatabase(const string& database_name);
+
+void dropDatabase(const string& database_name);
+
+void dropTable(const string& database_name, const string& table_name);
+
 #endif

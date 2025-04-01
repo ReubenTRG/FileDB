@@ -154,7 +154,7 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
 
 struct_insert parse_INSERT(const string& sql) {
     struct_insert insert_data;
-    regex insert_regex(R"(INSERT\s+INTO\s+(\w+)\s*VALUES\s*\((.*?)\))", regex_constants::icase);
+    regex insert_regex(R"(INSERT\s+INTO\s+(\w+)\s*VALUES\s*\((.*?)\)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
     if (regex_search(sql, match, insert_regex)) {
@@ -181,13 +181,13 @@ struct_update parse_UPDATE(const string& sql) {
 
     // Regex for UPDATE without WHERE clause
     regex update_no_where_regex(
-        R"(UPDATE\s+(\w+)\s+SET\s+(\w+)\s*=\s*(['"]?.*['"]?))",
+        R"(UPDATE\s+(\w+)\s+SET\s+(\w+)\s*=\s*(['"]?.*['"]?)\s*;?\s*$)",
         regex_constants::icase
     );
 
     // Regex for UPDATE with WHERE clause
     regex update_with_where_regex(
-        R"(UPDATE\s+(\w+)\s+SET\s+(\w+)\s*=\s*(['"]?.+?['"]?)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=)\s*(['"]?.*['"]?))",
+        R"(UPDATE\s+(\w+)\s+SET\s+(\w+)\s*=\s*(['"]?.+?['"]?)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=)\s*(['"]?.*['"]?)\s*;?\s*$)",
         regex_constants::icase
     );
 
@@ -222,7 +222,7 @@ struct_delete parse_DELETE(const string& sql) {
     regex delete_no_where_regex(R"(DELETE\s+FROM\s+(\w+))", regex_constants::icase);
 
     // Regex for DELETE with WHERE clause
-    regex delete_with_where_regex(R"(DELETE\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=|>|<)\s*(['"]?.*['"]?);)", regex_constants::icase);
+    regex delete_with_where_regex(R"(DELETE\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=|>|<)\s*(['"]?.*['"]?)\s*;?\s*$)", regex_constants::icase);
 
     smatch match;
 
@@ -248,7 +248,7 @@ string parse_USE(const string& sql) {
     string use_data = "";
 
     // Regex to capture the database name after USE
-    regex use_regex(R"(USE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*;)", regex_constants::icase);
+    regex use_regex(R"(USE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*;?\s*$)", regex_constants::icase);
 
     smatch match;
 
@@ -264,12 +264,16 @@ string parse_USE(const string& sql) {
 struct_drop parse_DROP(const string& sql) {
     struct_drop drop_data = {false, ""};
 
-    regex drop_regex(R"(DROP\s+(TABLE|DATABASE)\s+(\w+))", regex_constants::icase);
-
+    regex drop_regex(R"(DROP\s+(TABLE|DATABASE)\s+(\w+)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
     if (regex_search(sql, match, drop_regex)) {
-        drop_data.is_database = (match[1].str() == "DATABASE");
+        string type = match[1].str();
+        
+        // Convert to uppercase
+        transform(type.begin(), type.end(), type.begin(), ::toupper);
+        
+        drop_data.is_database = (type == "DATABASE");
         drop_data.name = match[2].str();
     } else {
         cerr << "Error: Invalid DROP statement syntax." << endl;

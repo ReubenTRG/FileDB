@@ -7,13 +7,13 @@
 
 using namespace std;
 
-// to compile: g++ -std=c++20 test.cpp src/parser.cpp src/logic.cpp src/file_handler.cpp -o test && ./test
+// to compile: g++ -std=c++20 test.cpp src/parser.cpp src/logic.cpp src/file_handler.cpp src/global.cpp -o test && ./test
 
 int main() {
     
     // string sql = "CREATE DATABASE School;";
     // string sql = "CREATE TABLE Students (id INT, name STRING, age INT);";
-    string sql = "INSERT INTO Students VALUES (101, 'John Doe', 22);";
+    // string sql = "INSERT INTO Students VALUES (101, 'John Doe', 22);";
     // string sql = "   SELECT name, dept, age FROM Class WHERE age >= 12;   ";
     // string sql = "SELECT name, age FROM Students WHERE age >= 18;";
     // string sql = "UPDATE Students SET age = 21 WHERE name = 'John Doe';";
@@ -21,7 +21,7 @@ int main() {
     // string sql = "CREATE TABLE Students (id INT, name VARCHAR, age INT);";
     // string sql = "UPDATE Students SET age = 20 WHERE name == 'John Doe';";
     // string sql = "DELETE FROM Students WHERE age < 18;"; 
-    // string sql = "USE stud;";
+    string sql = "USE School;";
     // string sql = "DROP DATABASE School;";
 
 

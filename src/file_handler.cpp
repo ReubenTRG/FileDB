@@ -159,29 +159,31 @@ void insertTablePointer(fstream &file, const string& table_name, uint32_t table_
 //     file.write(reinterpret_cast<const char*>(new_name_arr), BIT8_MAX);
 // }
 
-// void deleteTablePointer(fstream &file, const string& table_name) {
-//     uint8_t table_count = readPointersCount(file);
-//     uint8_t index = findTableIndex(file, table_name);
-//     if (index == 255) {
-//         cerr << "Error: Table not found." << endl;
-//         return;
-//     }
-//     if (index != table_count - 1) {
-//         auto [last_name, last_ptr] = readPointers(file, table_count - 1);
-//         file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
-//         uint8_t last_name_arr[BIT8_MAX] = {0};
-//         strncpy(reinterpret_cast<char*>(last_name_arr), last_name.c_str(), sizeof(last_name_arr));
-//         file.write(reinterpret_cast<const char*>(last_name_arr), BIT8_MAX);
-//         file.write(reinterpret_cast<const char*>(&last_ptr), POINTER_SIZE);
-//     }
-//     updatePointersCount(file, table_count - 1);
-// }
+int deleteTablePointer(fstream &file, const string& table_name) {
+    uint8_t table_count = readPointersCount(file);
+    uint8_t index = findTableIndex(file, table_name);
+    if (index == 255) {
+        return -1;
+    }
+    if (index != table_count - 1) {
+        auto [last_name, last_ptr] = readPointers(file, table_count - 1);
+        file.seekp(BIT8_MAX + 2 + (BIT8_MAX + POINTER_SIZE) * index, ios::beg);
+        uint8_t last_name_arr[BIT8_MAX] = {0};
+        strncpy(reinterpret_cast<char*>(last_name_arr), last_name.c_str(), sizeof(last_name_arr));
+        file.write(reinterpret_cast<const char*>(last_name_arr), BIT8_MAX);
+        file.write(reinterpret_cast<const char*>(&last_ptr), POINTER_SIZE);
+    }
+    updatePointersCount(file, table_count - 1);
+    return 0;
+}
 
-void createTableSchema(fstream &file, int table_ptr, vector<pair<string, uint8_t>> &columns) {
+void createTableSchema(fstream &file, int table_ptr, vector<struct_col_dtype> &columns) {
     file.seekp(table_ptr, ios::beg);
     uint8_t num_columns = columns.size();
     file.write(reinterpret_cast<const char*>(&num_columns), sizeof(num_columns));
-    for (const auto& [col_name, dtype] : columns) {
+    for (const auto& col : columns) {
+        string col_name = col.col_name;
+        uint8_t dtype = col.id;
         uint8_t col_name_arr[256] = {0};
         strncpy(reinterpret_cast<char*>(col_name_arr), col_name.c_str(), sizeof(col_name_arr));
         file.write(reinterpret_cast<const char*>(col_name_arr), 256);
@@ -196,22 +198,25 @@ uint8_t readTableSchemaSize(fstream &file, uint32_t table_ptr) {
     return num_columns;
 }
 
-vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr) {
+vector<struct_col_dtype> readTableSchema(fstream &file, uint32_t table_ptr) {
     file.seekg(table_ptr, ios::beg);
     uint8_t num_columns;
     file.read(reinterpret_cast<char*>(&num_columns), sizeof(num_columns));
-    vector<pair<string, uint8_t>> columns;
+    vector<struct_col_dtype> columns;
     for (uint8_t i = 0; i < num_columns; i++) {
         char col_name[256] = {0};
         file.read(col_name, 256);
         uint8_t dtype;
         file.read(reinterpret_cast<char*>(&dtype), sizeof(dtype));
-        columns.push_back(make_pair(string(col_name), dtype));
+        struct struct_col_dtype temp;
+        temp.col_name = string(col_name);
+        temp.id = dtype;
+        columns.push_back(temp);
     }
     return columns;
 }
 
-// void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<pair<string, uint8_t>>& new_columns) {
+// void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<struct_col_dtype>& new_columns) {
 //     createTableSchema(file, table_ptr, new_columns);
 // }
 
@@ -220,6 +225,12 @@ vector<pair<string, uint8_t>> readTableSchema(fstream &file, uint32_t table_ptr)
 //     uint8_t zero = 0;
 //     file.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
 // }
+
+void deleteTableSchema(fstream &file, uint32_t table_ptr, int total_schema_bytes) {
+    file.seekp(table_ptr, ios::beg);
+    uint8_t zero[BIT8_MAX * BIT8_MAX] = {0};
+    file.write(reinterpret_cast<const char*>(&zero), total_schema_bytes + 1);
+}
 
 
 void createTableData(fstream &file, int table_ptr, int total_schema_bytes) {
@@ -233,7 +244,7 @@ void createTableData(fstream &file, int table_ptr, int total_schema_bytes) {
 	}
 }
 
-vector<vector<string>> readTableData(fstream &file, int table_offset, const vector<pair<string, uint8_t>> &columns) {
+vector<vector<string>> readTableData(fstream &file, int table_offset, const vector<struct_col_dtype> &columns) {
     vector<vector<string>> table_data;
     file.seekg(table_offset, ios::beg);
     
@@ -246,7 +257,7 @@ vector<vector<string>> readTableData(fstream &file, int table_offset, const vect
             vector<string> row;
             for (const auto& column : columns) {
                 string value;
-                switch (column.second) {
+                switch (column.id) {
                     case 0x0: { // INT
                         int temp;
                         file.read(reinterpret_cast<char*>(&temp), sizeof(int));
@@ -286,7 +297,7 @@ vector<vector<string>> readTableData(fstream &file, int table_offset, const vect
             table_data.push_back(row);
         } else { // Skip over the record
             for (const auto& column : columns) {
-                switch (column.second) {
+                switch (column.id) {
                     case 0x0: file.seekg(sizeof(int), ios::cur); break;
                     case 0x1: file.seekg(sizeof(float), ios::cur); break;
                     case 0x2: file.seekg(sizeof(char), ios::cur); break;
@@ -300,44 +311,62 @@ vector<vector<string>> readTableData(fstream &file, int table_offset, const vect
     return table_data;
 }
 
-
-
 void insertTableData(fstream &file, uint32_t table_ptr, const vector<struct_name_id_data> &data, int total_schema_bytes) {
     file.seekp(table_ptr, ios::beg);
+    uint8_t flag = 0x0;
+    int found_offset = -1;
 
-	uint8_t flag = 0x0;
-	for (int i = 0; i < BIT8_MAX; i++) {
-		file.seekg(table_ptr + (1 + total_schema_bytes) * i, ios::beg);
-		file.read(reinterpret_cast<char*>(&flag), sizeof(flag));
-		if (flag == 0) {
-			break;
-		}
-	}
-
-	uint8_t insert_flag = 0x1;
-	file.write(reinterpret_cast<const char*>(&insert_flag), sizeof(insert_flag));
-	
-    uint8_t num_columns = data.size();
-    for (const auto& val : data) {
-        if (val.id == 0) {
-            int value = val.int_data;
-            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
-        } else if (val.id == 1) {
-            double value = val.float_data;
-            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
-		} else if (val.id == 2) {
-            char value = val.char_data;
-            file.write(reinterpret_cast<const char*>(value), sizeof(value));
-        } else if (val.id == 3) {
-            char value[256] = {0};
-            strncpy(value, val.string_data.c_str(), sizeof(value));
-            file.write(value, strlen(value));  // Write only up to the actual length
-        } else if (val.id == 4) {
-            bool value = val.bool_data;
-            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
-        } else {
-			cout << "Error: Invalid data type." << endl;
-			return;
-		}
+    for (int i = 0; i < BIT8_MAX; i++) {
+        file.seekg(table_ptr + (1 + total_schema_bytes) * i, ios::beg);
+        file.read(reinterpret_cast<char*>(&flag), sizeof(flag));
+        if (flag == 0) {
+            found_offset = i;
+            break;
+        }
     }
+
+    if (found_offset == -1) {
+        cerr << "Error: No empty slot found for insertion." << endl;
+        return;
+    }
+
+    file.seekp(table_ptr + (1 + total_schema_bytes) * found_offset, ios::beg);
+    uint8_t insert_flag = 0x1;
+    file.write(reinterpret_cast<const char*>(&insert_flag), sizeof(insert_flag));
+
+    for (const auto& val : data) {
+        switch (val.id) {
+            case 0x0:
+                file.write(reinterpret_cast<const char*>(&val.int_data), sizeof(val.int_data));
+                break;
+            case 0x1:
+                file.write(reinterpret_cast<const char*>(&val.float_data), sizeof(val.float_data));
+                break;
+            case 0x2:
+                file.write(reinterpret_cast<const char*>(&val.char_data), sizeof(val.char_data));
+                break;
+            case 0x3: {
+                char value[255] = {0};
+                strncpy(value, val.string_data.c_str(), 255);
+                file.write(value, 255);
+                break;
+            }
+            case 0x4:
+                file.write(reinterpret_cast<const char*>(&val.bool_data), sizeof(val.bool_data));
+                break;
+            default:
+                cerr << "Error: Invalid data type." << endl;
+                return;
+        }
+    }
+}
+
+void deleteTableData(fstream &file, uint32_t table_ptr, int total_schema_bytes) {
+    createTableData(file, table_ptr, total_schema_bytes);
+}
+
+
+
+void dropTable(fstream &file, string table_name) {
+    deleteTablePointer(file, table_name);
 }
