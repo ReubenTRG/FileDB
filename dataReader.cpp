@@ -1,5 +1,5 @@
 #include "./include/file_handler.h"
-#include "./include/global.h"
+#include "./include/semantic.h"
 
 #include <fstream>
 #include <iostream>

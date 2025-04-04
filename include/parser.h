@@ -1,20 +1,14 @@
-#ifndef READER_H
-#define READER_H
+#ifndef PARSER_H
+#define PARSER_H
 
 #include <string>
 #include <vector>
 using namespace std;
 
-struct struct_condition {
-	string column;
-	string oper;
-	string value;
-};
+#include "./semantic.h"
 
-struct struct_column_datatype {
-	string name;
-	string type;
-};
+extern const int commands_count;
+extern const string commands_list[];
 
 struct struct_select {
     vector<string> columns;
@@ -53,15 +47,23 @@ struct struct_drop {
     string name;
 };
 
-extern const int commands_count;
-extern const string commands_list[];
+struct struct_column_datatype {
+	string name;
+	string type;
+};
+
+struct struct_condition {
+	string column;
+	string oper;
+	string value;
+};
 
 string trimming(const string& str);
 int parse_command(const string& str);
 
 vector<string> parse_SELECT_column_list(const string& sql);
 string parse_SELECT_table(const string& sql);
-struct struct_condition parse_SELECT_condition(const string& sql);
+struct_column_datatype parse_SELECT_condition(const string& sql);
 
 struct_select parse_SELECT(const string& sql);
 

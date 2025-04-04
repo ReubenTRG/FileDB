@@ -1,7 +1,7 @@
 #include "../include/parser.h"
 #include "../include/logic.h"
 #include "../include/file_handler.h"
-#include "../include/global.h"
+#include "../include/semantic.h"
 
 #include <iostream>
 #include <string>
@@ -33,7 +33,7 @@ void createDatabase(const string& name) {
     file.close();
 }
 
-void createTable(const string& table_name, const string& database_name,  vector<struct_column_datatype> columns) {
+void createTable(const string& table_name, const string& database_name,  const vector<struct_column_datatype>& columns) {
     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
     if (!file) {
         cerr << "Error: Could not open database file." << endl;
@@ -85,8 +85,8 @@ void createTable(const string& table_name, const string& database_name,  vector<
     createTableData(file, end_of_file_pos, total_schema_bytes);
 
 	file.close();
-}
 
+}
 void insertRow(const string& table_name, const string& database_name, vector<string> values) {
     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
     if (!file) {
@@ -275,47 +275,47 @@ void deleteRows(const string& database_name, const string& table_name) {
 //     file.close();
 // }
 
-// void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value) {
-//     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
-//     if (!file) {
-//         cerr << "Error: Could not open database file." << endl;
-//         return;
-//     }
+void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value) {
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return;
+    }
 
-//     int pointer_ptr = findTableIndex(file, table_name);
-//     if (pointer_ptr == -1) {
-//         cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
-//         return;
-//     }
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return;
+    }
 
-//     auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
-//     vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
-//     int total_schema_bytes = totalSchemaBytes(table_schema);
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+    int total_schema_bytes = totalSchemaBytes(table_schema);
     
-//     int column_index = -1, column_offset = 0;
-//     for (size_t i = 0; i < table_schema.size(); i++) {
-//         if (table_schema[i].col_name == column) {
-//             column_index = i;
-//             break;
-//         }
-//         column_offset += columnSize(table_schema[i].id);
-//     }
-//     if (column_index == -1) {
-//         cerr << "Error: Column \"" << column << "\" not found." << endl;
-//         return;
-//     }
+    int column_index = -1, column_offset = 0;
+    for (size_t i = 0; i < table_schema.size(); i++) {
+        if (table_schema[i].col_name == column) {
+            column_index = i;
+            break;
+        }
+        column_offset += columnSize(table_schema[i].id);
+    }
+    if (column_index == -1) {
+        cerr << "Error: Column \"" << column << "\" not found." << endl;
+        return;
+    }
 
-//     // vector<pair<struct_name_id_data, int>> data = findTableDataByColumn(file, table_schema_ptr + 1 + total_schema_bytes, column_offset, total_schema_bytes, columnSize(table_schema[column_index].id));
-//     // for (const auto& [row_data, rowLoc] : data) {
-//     //     if (compare(row_data, op, value, table_schema[column_index].id)) {
-//     //         file.seekp(rowLoc, ios::beg);
-//     //         uint8_t zero = 0;
-//     //         file.write(reinterpret_cast<char*>(&zero), sizeof(zero));
-//     //     }
-//     // }
-//     file.close();
-// }
+    vector<pair<struct_name_id_data, int>> data = findTableDataByColumn(file, table_schema_ptr + 1 + total_schema_bytes, column_offset, total_schema_bytes, columnSize(table_schema[column_index].id));
+    for (const auto& pair : data) {
+        if (compare(pair.first, op, value, table_schema[column_index].id)) {
+            file.seekp(pair.second, ios::beg);
+            uint8_t zero = 0;
+            file.write(reinterpret_cast<char*>(&zero), sizeof(zero));
+        }
+    }
 
+    file.close();
+}
 string selectTableAll(const string& database_name, const string& table_name) {
     string response = "";
 

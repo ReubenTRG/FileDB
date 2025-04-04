@@ -3,7 +3,10 @@
 #include <vector>
 #include <regex>
 #include <algorithm>
+
 #include "../include/parser.h"
+#include "../include/semantic.h"
+#include "../include/lexer.h"
 
 using namespace std;
 
@@ -58,53 +61,6 @@ vector<string> splitColumns(const string& columns_str) {
     return columns;
 }
 
-vector<string> parse_SELECT_column_list(const string& sql) {
-    vector<string> columns;
-    regex column_regex(R"(SELECT\s+(.+?)\s+FROM)", regex_constants::icase);
-    smatch match;
-
-    if (regex_search(sql, match, column_regex)) {
-        string columns_str = match[1].str();
-        if (columns_str == "*") {
-            columns.push_back("*");
-        } else {
-            regex split_regex(R"(\s*,\s*)");
-            sregex_token_iterator iter(columns_str.begin(), columns_str.end(), split_regex, -1);
-            sregex_token_iterator end;
-            while (iter != end) {
-                columns.push_back(*iter++);
-            }
-        }
-    }
-    return columns;
-}
-
-string parse_SELECT_table(const string& sql) {
-    string table;
-    regex table_regex(R"(FROM\s+([^\s;]+))", regex_constants::icase);
-    smatch match;
-
-    if (regex_search(sql, match, table_regex)) {
-        table = match[1].str();
-    }
-    return table;
-}
-
-struct struct_condition parse_SELECT_condition(const string& sql) {
-    struct struct_condition cond;
-    regex condition_regex(R"(WHERE\s+(\w+)\s*(=|>|<|>=|<=|!=)\s*(['\"]?.+?['\"]?))", regex_constants::icase);
-    smatch match;
-
-    if (regex_search(sql, match, condition_regex)) {
-        cout << "testing: " << match[0].str() << endl;
-        cond.column = match[1].str(); // Extract column name
-        cond.oper = match[2].str();   // Extract operator
-        cond.value = match[3].str(); // Extract value
-    }
-
-    return cond;
-}
-
 struct_select parse_SELECT(const string& sql) {
     struct_select select_data = { {}, "", false, "", "", "" };
 
@@ -116,26 +72,24 @@ struct_select parse_SELECT(const string& sql) {
 
     smatch match;
 
-    if (regex_search(sql, match, select_with_where_regex)) {
-        // Match structure with WHERE clause
-        select_data.columns = splitColumns(match[1].str()); // Extract column list
-        select_data.table_name = match[2].str();            // Extract table name
-        select_data.has_condition = true;
-        select_data.condition_column = match[3].str();      // Extract condition column
-        select_data.condition_operator = match[4].str();    // Extract condition operator
-        select_data.condition_value = match[5].str();       // Extract condition value
-    } else if (regex_search(sql, match, select_no_where_regex)) {
-        // Match structure without WHERE clause
-        select_data.columns = splitColumns(match[1].str()); // Extract column list
-        select_data.table_name = match[2].str();            // Extract table name
-        select_data.has_condition = false;
-    } else {
-        cerr << "Error: Invalid SELECT statement syntax." << endl;
+    if (validate_SELECT(sql)) {
+        if (regex_search(sql, match, select_with_where_regex)) {
+            // Match structure with WHERE clause
+            select_data.columns = splitColumns(match[1].str()); // Extract column list
+            select_data.table_name = match[2].str();            // Extract table name
+            select_data.has_condition = true;
+            select_data.condition_column = match[3].str();      // Extract condition column
+            select_data.condition_operator = match[4].str();    // Extract condition operator
+            select_data.condition_value = match[5].str();       // Extract condition value
+        } else if (regex_search(sql, match, select_no_where_regex)) {
+            // Match structure without WHERE clause
+            select_data.columns = splitColumns(match[1].str()); // Extract column list
+            select_data.table_name = match[2].str();            // Extract table name
+        }
     }
 
     return select_data;
 }
-
 
 string parse_CREATE_option(const string& sql) {
     string option;
@@ -143,8 +97,10 @@ string parse_CREATE_option(const string& sql) {
     regex option_regex(R"(CREATE\s+(TABLE|DATABASE))", regex_constants::icase);
     smatch match;
 
-    if (regex_search(sql, match, option_regex)) {
-        option = match[1].str(); // Extract the matched option
+    if (validate_CREATE(sql)) {
+        if (regex_search(sql, match, option_regex)) {
+            option = match[1].str(); // Extract the matched option
+        }
     }
 
     return option;
@@ -156,8 +112,10 @@ string parse_CREATE_name(const string& sql) {
     regex name_regex(R"(CREATE\s+(TABLE|DATABASE)\s+(\w+))", regex_constants::icase);
     smatch match;
 
-    if (regex_search(sql, match, name_regex)) {
-        name = match[2].str(); // Extract the name (table or database)
+    if (validate_CREATE(sql)) {
+        if (regex_search(sql, match, name_regex)) {
+            name = match[2].str(); // Extract the name (table or database)
+        }
     }
 
     return name;
@@ -170,25 +128,27 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
     regex column_regex(R"(CREATE\s+TABLE\s+\w+\s*\((.+?)\)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
-    if (regex_search(sql, match, column_regex)) {
-        string columns_str = match[1].str(); // Extract everything inside the parentheses
+    if (validate_CREATE(sql)) {
+        if (regex_search(sql, match, column_regex)) {
+            string columns_str = match[1].str(); // Extract everything inside the parentheses
 
-        // Regex to split individual column definitions by commas
-        regex split_regex(R"(\s*,\s*)");
-        sregex_token_iterator iter(columns_str.begin(), columns_str.end(), split_regex, -1);
-        sregex_token_iterator end;
+            // Regex to split individual column definitions by commas
+            regex split_regex(R"(\s*,\s*)");
+            sregex_token_iterator iter(columns_str.begin(), columns_str.end(), split_regex, -1);
+            sregex_token_iterator end;
 
-        // Process each column definition
-        regex column_def_regex(R"((\w+)\s+(\w+(\(\d+\))?))", regex_constants::icase);
-        smatch column_match;
-        while (iter != end) {
-            string column_def = *iter++;
-            if (regex_match(column_def, column_match, column_def_regex)) {
-                struct_column_datatype col;
-                col.name = column_match[1].str(); // Extract column name
-                col.type = column_match[2].str(); // Extract data type
-                cout << "Column name: " << col.name << ", Type: " << col.type << endl;
-                columns.push_back(col);
+            // Process each column definition
+            regex column_def_regex(R"((\w+)\s+(\w+(\(\d+\))?))", regex_constants::icase);
+            smatch column_match;
+            while (iter != end) {
+                string column_def = *iter++;
+                if (regex_match(column_def, column_match, column_def_regex)) {
+                    struct_column_datatype col;
+                    col.name = column_match[1].str(); // Extract column name
+                    col.type = column_match[2].str(); // Extract data type
+                    cout << "Column name: " << col.name << ", Type: " << col.type << endl;
+                    columns.push_back(col);
+                }
             }
         }
     }
@@ -201,20 +161,20 @@ struct_insert parse_INSERT(const string& sql) {
     regex insert_regex(R"(INSERT\s+INTO\s+(\w+)\s*VALUES\s*\((.*?)\)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
-    if (regex_search(sql, match, insert_regex)) {
-        insert_data.table_name = match[1].str(); // Extract table name
+    if (validate_INSERT(sql)) {
+        if (regex_search(sql, match, insert_regex)) {
+            insert_data.table_name = match[1].str(); // Extract table name
 
-        // Extract values
-        string values_str = match[2].str();
-        regex split_regex(R"(\s*,\s*)");
-        sregex_token_iterator iter(values_str.begin(), values_str.end(), split_regex, -1);
-        sregex_token_iterator end;
+            // Extract values
+            string values_str = match[2].str();
+            regex split_regex(R"(\s*,\s*)");
+            sregex_token_iterator iter(values_str.begin(), values_str.end(), split_regex, -1);
+            sregex_token_iterator end;
 
-        while (iter != end) {
-            insert_data.values.push_back(*iter++);
+            while (iter != end) {
+                insert_data.values.push_back(*iter++);
+            }
         }
-    } else {
-        cerr << "Error: Invalid INSERT INTO syntax." << endl;
     }
 
     return insert_data;
@@ -237,23 +197,23 @@ struct_update parse_UPDATE(const string& sql) {
 
     smatch match;
 
-    if (regex_search(sql, match, update_with_where_regex)) {
-        // Match the structure with WHERE clause
-        update_data.table_name = match[1].str();        // Extract table name
-        update_data.column_name = match[2].str();      // Extract column name
-        update_data.value = match[3].str();            // Extract value
-        update_data.has_condition = true;
-        update_data.condition_column = match[4].str(); // Extract condition column
-        update_data.condition_operator = match[5].str(); // Extract condition operator
-        update_data.condition_value = match[6].str();  // Extract condition value
-    } else if (regex_search(sql, match, update_no_where_regex)) {
-        // Match the structure without WHERE clause
-        update_data.table_name = match[1].str();        // Extract table name
-        update_data.column_name = match[2].str();      // Extract column name
-        update_data.value = match[3].str();            // Extract value
-        update_data.has_condition = false;
-    } else {
-        cerr << "Error: Invalid UPDATE statement syntax." << endl;
+    if (validate_UPDATE(sql)) {
+        if (regex_search(sql, match, update_with_where_regex)) {
+            // Match the structure with WHERE clause
+            update_data.table_name = match[1].str();        // Extract table name
+            update_data.column_name = match[2].str();      // Extract column name
+            update_data.value = match[3].str();            // Extract value
+            update_data.has_condition = true;
+            update_data.condition_column = match[4].str(); // Extract condition column
+            update_data.condition_operator = match[5].str(); // Extract condition operator
+            update_data.condition_value = match[6].str();  // Extract condition value
+        } else if (regex_search(sql, match, update_no_where_regex)) {
+            // Match the structure without WHERE clause
+            update_data.table_name = match[1].str();        // Extract table name
+            update_data.column_name = match[2].str();      // Extract column name
+            update_data.value = match[3].str();            // Extract value
+            update_data.has_condition = false;
+        }
     }
 
     return update_data;
@@ -270,19 +230,19 @@ struct_delete parse_DELETE(const string& sql) {
 
     smatch match;
 
-    if (regex_search(sql, match, delete_with_where_regex)) {
-        // Match the structure with WHERE clause
-        delete_data.table_name = match[1].str();        // Extract table name
-        delete_data.has_condition = true;
-        delete_data.condition_column = match[2].str(); // Extract condition column
-        delete_data.condition_operator = match[3].str(); // Extract condition operator
-        delete_data.condition_value = match[4].str();  // Extract condition value
-    } else if (regex_search(sql, match, delete_no_where_regex)) {
-        // Match the structure without WHERE clause
-        delete_data.table_name = match[1].str();        // Extract table name
-        delete_data.has_condition = false;
-    } else {
-        cerr << "Error: Invalid DELETE statement syntax." << endl;
+    if (validate_DELETE(sql)) {
+        if (regex_search(sql, match, delete_with_where_regex)) {
+            // Match the structure with WHERE clause
+            delete_data.table_name = match[1].str();        // Extract table name
+            delete_data.has_condition = true;
+            delete_data.condition_column = match[2].str(); // Extract condition column
+            delete_data.condition_operator = match[3].str(); // Extract condition operator
+            delete_data.condition_value = match[4].str();  // Extract condition value
+        } else if (regex_search(sql, match, delete_no_where_regex)) {
+            // Match the structure without WHERE clause
+            delete_data.table_name = match[1].str();        // Extract table name
+            delete_data.has_condition = false;
+        }
     }
 
     return delete_data;
@@ -296,10 +256,10 @@ string parse_USE(const string& sql) {
 
     smatch match;
 
-    if (regex_search(sql, match, use_regex)) {
-        use_data = match[1].str();  // Extract the database name
-    } else {
-        cerr << "Error: Invalid USE statement syntax." << endl;
+    if (validate_USE(sql)) {
+        if (regex_search(sql, match, use_regex)) {
+            use_data = match[1].str();  // Extract the database name
+        }
     }
 
     return use_data;
@@ -311,16 +271,16 @@ struct_drop parse_DROP(const string& sql) {
     regex drop_regex(R"(DROP\s+(TABLE|DATABASE)\s+(\w+)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
-    if (regex_search(sql, match, drop_regex)) {
-        string type = match[1].str();
-        
-        // Convert to uppercase
-        transform(type.begin(), type.end(), type.begin(), ::toupper);
-        
-        drop_data.is_database = (type == "DATABASE");
-        drop_data.name = match[2].str();
-    } else {
-        cerr << "Error: Invalid DROP statement syntax." << endl;
+    if (validate_DROP(sql)) {
+        if (regex_search(sql, match, drop_regex)) {
+            string type = match[1].str();
+            
+            // Convert to uppercase
+            transform(type.begin(), type.end(), type.begin(), ::toupper);
+            
+            drop_data.is_database = (type == "DATABASE");
+            drop_data.name = match[2].str();
+        }
     }
 
     return drop_data;
