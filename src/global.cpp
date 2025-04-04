@@ -80,7 +80,7 @@ vector<struct_name_id_data> schemaToValue(const vector<struct_col_dtype>& table_
                 temp.int_data = stoi(values[i]);
                 break;
             case 0x1: // FLOAT
-                temp.float_data = stof(values[i]);
+                temp.float_data = stod(values[i]);
                 break;
             case 0x2: // CHAR
                 temp.char_data = values[i][0];
@@ -100,3 +100,86 @@ vector<struct_name_id_data> schemaToValue(const vector<struct_col_dtype>& table_
     return data;
 }
 
+int columnSize(int id) {
+    switch (id) {
+        case 0x0: // INT
+            return 0x4;
+        case 0x1: // FLOAT
+            return 0x8;
+        case 0x2: // CHAR
+            return 0x1;
+        case 0x3: // STRING
+            return 0xff;
+        case 0x4: // BOOL
+            return 0x1;
+        default:
+            return -1;
+    }
+}
+
+string datatypeIdToString(int id) {
+    switch (id) {
+        case 0x0: // INT
+            return "INT";
+        case 0x1: // FLOAT
+            return "FLOAT";
+        case 0x2: // CHAR
+            return "CHAR";
+        case 0x3: // STRING
+            return "STRING";
+        case 0x4: // BOOL
+            return "BOOL";
+        default:
+            return "INVALID";
+    }
+}
+
+bool compare(const string& column, const string& oper, const string& value, int dataTypeId, const struct_name_id_data& data) {
+    switch (dataTypeId) {
+        case 0: { // INT
+            int val = stoi(value);
+            if (oper == "==") return data.int_data == val;
+            else if (oper == "!=") return data.int_data != val;
+            else if (oper == "<") return data.int_data < val;
+            else if (oper == "<=") return data.int_data <= val;
+            else if (oper == ">") return data.int_data > val;
+            else if (oper == ">=") return data.int_data >= val;
+            break;
+        }
+        case 1: { // FLOAT
+            float val = stof(value);
+            if (oper == "==") return data.float_data == val;
+            else if (oper == "!=") return data.float_data != val;
+            else if (oper == "<") return data.float_data < val;
+            else if (oper == "<=") return data.float_data <= val;
+            else if (oper == ">") return data.float_data > val;
+            else if (oper == ">=") return data.float_data >= val;
+            break;
+        }
+        case 2: { // CHAR
+            char val = value[0];  // Assuming the value is a single character
+            if (oper == "==") return data.char_data == val;
+            else if (oper == "!=") return data.char_data != val;
+            break;
+        }
+        case 3: { // STRING
+            if (oper == "==") return data.string_data == value;
+            else if (oper == "!=") return data.string_data != value;
+            else if (oper == "<") return data.string_data < value;
+            else if (oper == "<=") return data.string_data <= value;
+            else if (oper == ">") return data.string_data > value;
+            else if (oper == ">=") return data.string_data >= value;
+            break;
+        }
+        case 4: { // BOOL
+            bool val = (value == "true" || value == "1");
+            if (oper == "==") return data.bool_data == val;
+            else if (oper == "!=") return data.bool_data != val;
+            break;
+        }
+        default:
+            cerr << "Error: Invalid data type." << endl;
+            return false;
+    }
+    return false; // Return false if no valid comparison was made
+}

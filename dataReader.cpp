@@ -49,11 +49,30 @@ void read_table_data(fstream &file) {
         vector<struct_col_dtype> table_schema = readTableSchema(file, table_info.second);
         int total_schema_bytes = totalSchemaBytes(table_schema);
         
-        vector<vector<string>> table_data = readTableData(file, table_info.second + 1 + total_schema_bytes, table_schema);
+        vector<vector<struct_name_id_data>> table_data = readTableData(file, table_info.second + 1 + (256 + 1) * table_schema.size(), table_schema);
         
         for (const auto& row : table_data) {
             for (const auto& value : row) {
-                cout << value << "\t";
+                switch (value.id) {
+                    case 0:
+                        cout << value.int_data<< " ";
+                        break;
+                    case 1:
+                        cout << value.float_data << " ";
+                        break;
+                    case 2:
+                        cout << value.char_data << " ";
+                        break;
+                    case 3:
+                        cout << value.string_data << " ";
+                        break;
+                    case 4:
+                        cout << value.bool_data << " ";
+                        break;
+                    default:
+                        cout << "Unknown data type" << " ";
+                        break;
+                }
             }
             cout << endl;
         }

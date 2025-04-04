@@ -37,9 +37,12 @@ void updateTableSchema(fstream &file, uint32_t table_ptr, const vector<struct_co
 void deleteTableSchema(fstream &file, uint32_t table_ptr);
 
 void createTableData(fstream &file, int table_ptr, int total_schema_bytes);
-vector<vector<string>> readTableData(fstream &file, int table_offset, const vector<struct_col_dtype> &columns);
+vector<vector<struct_name_id_data>> readTableData(fstream &file, int table_offset, const vector<struct_col_dtype> &columns);
 void insertTableData(fstream &file, uint32_t table_ptr, const vector<struct_name_id_data> &data, int total_schema_bytes);
 void deleteTableData(fstream &file, uint32_t table_ptr, int total_schema_bytes);
+vector<pair<struct_name_id_data, int>> findTableDataByColumn(fstream &file, uint32_t table_ptr, int col_jump, int total_schema_bytes, int length);
+
+bool writeTableData(fstream &file, int data_ptr, const vector<vector<struct_name_id_data>> &table_data);
 
 void dropTable(fstream &file, string table_name);
 

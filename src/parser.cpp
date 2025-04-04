@@ -43,6 +43,21 @@ int parse_command(const string& str) {
     return -1;
 }
 
+vector<string> splitColumns(const string& columns_str) {
+    vector<string> columns;
+    if (columns_str == "*") {
+        columns.push_back("*");
+    } else {
+        regex split_regex(R"(\s*,\s*)");
+        sregex_token_iterator iter(columns_str.begin(), columns_str.end(), split_regex, -1);
+        sregex_token_iterator end;
+        while (iter != end) {
+            columns.push_back(*iter++);
+        }
+    }
+    return columns;
+}
+
 vector<string> parse_SELECT_column_list(const string& sql) {
     vector<string> columns;
     regex column_regex(R"(SELECT\s+(.+?)\s+FROM)", regex_constants::icase);
@@ -63,7 +78,6 @@ vector<string> parse_SELECT_column_list(const string& sql) {
     }
     return columns;
 }
-
 
 string parse_SELECT_table(const string& sql) {
     string table;
@@ -90,6 +104,38 @@ struct struct_condition parse_SELECT_condition(const string& sql) {
 
     return cond;
 }
+
+struct_select parse_SELECT(const string& sql) {
+    struct_select select_data = { {}, "", false, "", "", "" };
+
+    // Regex for SELECT without WHERE clause
+    regex select_no_where_regex(R"(SELECT\s+(.+?)\s+FROM\s+(\w+)\s*;?\s*$)", regex_constants::icase);
+
+    // Regex for SELECT with WHERE clause
+    regex select_with_where_regex(R"(SELECT\s+(.+?)\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=|>|<)\s*(['"]?.*['"]?)\s*;?\s*$)", regex_constants::icase);
+
+    smatch match;
+
+    if (regex_search(sql, match, select_with_where_regex)) {
+        // Match structure with WHERE clause
+        select_data.columns = splitColumns(match[1].str()); // Extract column list
+        select_data.table_name = match[2].str();            // Extract table name
+        select_data.has_condition = true;
+        select_data.condition_column = match[3].str();      // Extract condition column
+        select_data.condition_operator = match[4].str();    // Extract condition operator
+        select_data.condition_value = match[5].str();       // Extract condition value
+    } else if (regex_search(sql, match, select_no_where_regex)) {
+        // Match structure without WHERE clause
+        select_data.columns = splitColumns(match[1].str()); // Extract column list
+        select_data.table_name = match[2].str();            // Extract table name
+        select_data.has_condition = false;
+    } else {
+        cerr << "Error: Invalid SELECT statement syntax." << endl;
+    }
+
+    return select_data;
+}
+
 
 string parse_CREATE_option(const string& sql) {
     string option;
@@ -121,7 +167,7 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
     vector<struct_column_datatype> columns;
 
     // Regex to match columns within the CREATE TABLE statement
-    regex column_regex(R"(CREATE\s+TABLE\s+\w+\s*\((.+?)\);)", regex_constants::icase);
+    regex column_regex(R"(CREATE\s+TABLE\s+\w+\s*\((.+?)\)\s*;?\s*$)", regex_constants::icase);
     smatch match;
 
     if (regex_search(sql, match, column_regex)) {
@@ -145,8 +191,6 @@ vector<struct_column_datatype> parse_CREATE_columns(const string& sql) {
                 columns.push_back(col);
             }
         }
-    } else {
-        cerr << "Error: Invalid CREATE TABLE syntax." << endl;
     }
 
     return columns;
@@ -219,7 +263,7 @@ struct_delete parse_DELETE(const string& sql) {
     struct_delete delete_data = {"", false, "", "", ""};
 
     // Regex for DELETE without WHERE clause
-    regex delete_no_where_regex(R"(DELETE\s+FROM\s+(\w+))", regex_constants::icase);
+    regex delete_no_where_regex(R"(DELETE\s+FROM\s+(\w+)\s*;?\s*$)", regex_constants::icase);
 
     // Regex for DELETE with WHERE clause
     regex delete_with_where_regex(R"(DELETE\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*(==|>=|<=|!=|>|<)\s*(['"]?.*['"]?)\s*;?\s*$)", regex_constants::icase);

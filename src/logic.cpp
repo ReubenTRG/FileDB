@@ -17,63 +17,6 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-// int totalSchemaBytes(const vector<struct_col_dtype>& table_schema) {
-//     int total_schema_bytes = 0;
-//     for (size_t i = 0; i < table_schema.size(); i++) {
-//         switch (table_schema[i].id) {
-//             case 0x0: // INT
-//                 total_schema_bytes += 0x4;
-//                 break;
-//             case 0x1: // FLOAT
-//                 total_schema_bytes += 0x8;
-//                 break;
-//             case 0x2: // CHAR
-//                 total_schema_bytes += 0x1;
-//                 break;
-//             case 0x3: // STRING
-//                 total_schema_bytes += 0xff;
-//                 break;
-//             case 0x4: // BOOL
-//                 total_schema_bytes += 0x1;
-//                 break;
-//             default:
-//                 return -1;
-//         }
-//     }
-//     return total_schema_bytes;
-// }
-
-// vector<struct_name_id_data> schemaToValue(const vector<struct_col_dtype>& table_schema, const vector<string>& values) {
-//     vector<struct_name_id_data> data;
-//     for (size_t i = 0; i < table_schema.size(); i++) {
-//         struct_name_id_data temp;
-//         temp.name = table_schema[i].col_name;
-//         temp.id = table_schema[i].id;
-//         switch (table_schema[i].id) {
-//             case 0x0: // INT
-//                 temp.int_data = stoi(values[i]);
-//                 break;
-//             case 0x1: // FLOAT
-//                 temp.float_data = stof(values[i]);
-//                 break;
-//             case 0x2: // CHAR
-//                 temp.char_data = values[i][0];
-//                 break;
-//             case 0x3: // STRING
-//                 temp.string_data = values[i];
-//                 break;
-//             case 0x4: // BOOL
-//                 temp.bool_data = (values[i] == "true" || values[i] == "1");
-//                 break;
-//             default:
-//                 vector<struct_name_id_data> empty;
-//                 return empty;
-//         }
-//         data.push_back(temp);
-//     }
-//     return data;
-// }
-
 void createDatabase(const string& name) {
     fstream file(name + ".fdb", ios::in | ios::out | ios::binary | ios::trunc);
     if (!file) {
@@ -90,16 +33,16 @@ void createDatabase(const string& name) {
     file.close();
 }
 
-void createTable(const string& tabel_name, const string& database_name,  vector<struct_column_datatype> columns) {
+void createTable(const string& table_name, const string& database_name,  vector<struct_column_datatype> columns) {
     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
     if (!file) {
         cerr << "Error: Could not open database file." << endl;
         return;
     }
 
-    int found = findTableIndex(file, tabel_name);
+    int found = findTableIndex(file, table_name);
     if (found != -1) {
-		cerr << "Error: Table \"" << tabel_name << "\" already exists." << endl;
+		cerr << "Error: Table \"" << table_name << "\" already exists." << endl;
 		return;
 	}
 
@@ -111,13 +54,23 @@ void createTable(const string& tabel_name, const string& database_name,  vector<
     
     file.seekp(0, ios::end);
     int end_of_file_pos  = file.tellp();
-    insertTablePointer(file, tabel_name, end_of_file_pos);
+    insertTablePointer(file, table_name, end_of_file_pos);
 
 	updatePointersCount(file, table_count + 1);
+
+    cout << "(test) table schema: ";
+    for (auto& col: columns) {
+        cout << col.name << ": " << col.type << " ";
+    }
     
     vector<struct_col_dtype> columns_schema = typeNameToId(columns);
+    cout << "(test) table schema2: ";
+    for (auto& col : columns_schema) {
+        cout << col.col_name << ": " << col.id << " ";
+    }
     
     int total_schema_bytes = totalSchemaBytes(columns_schema);
+    cout << "(test) totalschemabytes: " << total_schema_bytes << endl;
     if (total_schema_bytes == -1) {
         cerr << "Error: Invalid data type." << endl;
         return;
@@ -150,14 +103,12 @@ void insertRow(const string& table_name, const string& database_name, vector<str
     auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
 
     vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
-    cout << "(test) table schema: ";
     for (auto& col : table_schema) {
         cout << col.col_name << ": " << col.id << " ";
     }
     cout << endl;
 
     int total_schema_bytes = totalSchemaBytes(table_schema);
-    cout << "(test) totalschemabytes: " << total_schema_bytes << endl;
     if (total_schema_bytes == -1) {
         cerr << "Error: invalid datatype." << endl;
         return;
@@ -169,13 +120,7 @@ void insertRow(const string& table_name, const string& database_name, vector<str
         return;
     }
 
-    // test
-    file.seekg(table_schema_ptr, ios::beg);
-    uint8_t a;
-    file.read(reinterpret_cast<char*>(&a), sizeof(a));
-    cout << "(test) val at schema ptr: " << (int)a << endl;
-
-    insertTableData(file, table_schema_ptr + 1 + total_schema_bytes, data, total_schema_bytes);
+    insertTableData(file, table_schema_ptr + 1 + (256 + 1) * table_schema.size(), data, total_schema_bytes);
 
     file.close();
 }
@@ -203,7 +148,7 @@ void deleteRows(const string& database_name, const string& table_name) {
         return;
     }
 
-    deleteTableData(file, table_schema_ptr + 1, total_schema_bytes);
+    deleteTableData(file, table_schema_ptr + 1 + (1 + 256) * table_schema.size(), total_schema_bytes);
 
     file.close();
 }
@@ -236,200 +181,433 @@ void deleteRows(const string& database_name, const string& table_name) {
 //     file.close();
 // }
 
-void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value) {
+// void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value) {
+//     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+//     if (!file) {
+//         cerr << "Error: Could not open database file." << endl;
+//         return;
+//     }
+//
+//     int pointer_ptr = findTableIndex(file, table_name);
+//     if (pointer_ptr == -1) {
+//         cerr << "Error: Table \"" << table_name << "\" doesnt exists." << endl;
+//         return;
+//     }
+//
+//     auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+//
+//     vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+//
+//     int total_schema_bytes = totalSchemaBytes(table_schema);
+//     if (total_schema_bytes == -1) {
+//         cerr << "Error: invalid datatype." << endl;
+//         return;
+//     }
+//
+//     // Find the column index in the schema
+//     int column_index = -1;
+//     int column_offset = 0;
+//     for (size_t i = 0; i < table_schema.size(); i++) {
+//         if (table_schema[i].col_name == column) {
+//             column_index = i;
+//             break;
+//         }
+//         // Calculate offset for each column before the target column
+//         switch (table_schema[i].id) {
+//             case 0x0: // INT
+//                 column_offset += 0x4;
+//                 break;
+//             case 0x1: // FLOAT
+//                 column_offset += 0x8;
+//                 break;
+//             case 0x2: // CHAR
+//                 column_offset += 0x1;
+//                 break;
+//             case 0x3: // STRING
+//                 column_offset += 0xff;
+//                 break;
+//             case 0x4: // BOOL
+//                 column_offset += 0x1;
+//                 break;
+//         }
+//     }
+//
+//     if (column_index == -1) {
+//         cerr << "Error: Column \"" << column << "\" not found in table." << endl;
+//         return;
+//     }
+//
+//     // Get column data type
+//     uint8_t column_type = table_schema[column_index].id;
+//
+//     // Seek to the start of table data
+//     uint32_t data_start_pos = table_schema_ptr + 1 + total_schema_bytes;
+//     file.seekg(data_start_pos, ios::beg);
+//
+//     // Process each row
+//     char flag;
+//     bool condition_met;
+//     int int_val, int_comp;
+//     double float_val, float_comp;
+//     char char_val, char_comp;
+//     string str_val, str_comp;
+//     bool bool_val, bool_comp;
+//
+//     // Convert comparison value based on column type
+//     switch (column_type) {
+//         case 0x0: // INT
+//             int_comp = stoi(value);
+//             break;
+//         case 0x1: // FLOAT
+//             float_comp = stod(value);
+//             break;
+//         case 0x2: // CHAR
+//             char_comp = value[0];
+//             break;
+//         case 0x3: // STRING
+//             str_comp = value;
+//             break;
+//         case 0x4: // BOOL
+//             bool_comp = (value == "true" || value == "1");
+//             break;
+//     }  
+//
+//     file.close();
+// }
+
+// void deleteRowsCondition(const string& database_name, const string& table_name, const string& column, const string& op, const string& value) {
+//     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+//     if (!file) {
+//         cerr << "Error: Could not open database file." << endl;
+//         return;
+//     }
+
+//     int pointer_ptr = findTableIndex(file, table_name);
+//     if (pointer_ptr == -1) {
+//         cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+//         return;
+//     }
+
+//     auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+//     vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+//     int total_schema_bytes = totalSchemaBytes(table_schema);
+    
+//     int column_index = -1, column_offset = 0;
+//     for (size_t i = 0; i < table_schema.size(); i++) {
+//         if (table_schema[i].col_name == column) {
+//             column_index = i;
+//             break;
+//         }
+//         column_offset += columnSize(table_schema[i].id);
+//     }
+//     if (column_index == -1) {
+//         cerr << "Error: Column \"" << column << "\" not found." << endl;
+//         return;
+//     }
+
+//     // vector<pair<struct_name_id_data, int>> data = findTableDataByColumn(file, table_schema_ptr + 1 + total_schema_bytes, column_offset, total_schema_bytes, columnSize(table_schema[column_index].id));
+//     // for (const auto& [row_data, rowLoc] : data) {
+//     //     if (compare(row_data, op, value, table_schema[column_index].id)) {
+//     //         file.seekp(rowLoc, ios::beg);
+//     //         uint8_t zero = 0;
+//     //         file.write(reinterpret_cast<char*>(&zero), sizeof(zero));
+//     //     }
+//     // }
+//     file.close();
+// }
+
+string selectTableAll(const string& database_name, const string& table_name) {
+    string response = "";
+
     fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
     if (!file) {
         cerr << "Error: Could not open database file." << endl;
-        return;
+        return "Error: Could not open database file.";
     }
 
     int pointer_ptr = findTableIndex(file, table_name);
     if (pointer_ptr == -1) {
-        cerr << "Error: Table \"" << table_name << "\" doesnt exists." << endl;
-        return;
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
     }
 
     auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
 
+    // Read schema
     vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
-
-    int total_schema_bytes = totalSchemaBytes(table_schema);
-    if (total_schema_bytes == -1) {
-        cerr << "Error: invalid datatype." << endl;
-        return;
+    
+    response += "Table: " + table_name + "\nSchema:\n";
+    
+    for (const auto& col : table_schema) {
+        response += col.col_name + "(" + datatypeIdToString(col.id) + ")\n";
     }
 
-    // Find the column index in the schema
-    int column_index = -1;
-    int column_offset = 0;
-    for (size_t i = 0; i < table_schema.size(); i++) {
-        if (table_schema[i].col_name == column) {
-            column_index = i;
-            break;
+    // Read table data
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    response += "\nData:\n";
+    for (const auto& row : table_data) {
+        for (const auto& cell : row) {
+            switch (cell.id) {
+                case 0x0: // INT
+                    response += to_string(cell.int_data) + " ";
+                    break;
+                case 0x1: // FLOAT
+                    response += to_string(cell.float_data) + " ";
+                    break;
+                case 0x2: // CHAR
+                    response += cell.char_data + " ";
+                    break;
+                case 0x3: // STRING
+                    response += cell.string_data + " ";
+                    break;
+                case 0x4: // BOOL
+                    response += to_string(cell.bool_data) + " ";
+                    break;
+                default:
+                    return "INVALID";
+            }
         }
-        // Calculate offset for each column before the target column
-        switch (table_schema[i].id) {
-            case 0x0: // INT
-                column_offset += 0x4;
-                break;
-            case 0x1: // FLOAT
-                column_offset += 0x8;
-                break;
-            case 0x2: // CHAR
-                column_offset += 0x1;
-                break;
-            case 0x3: // STRING
-                column_offset += 0xff;
-                break;
-            case 0x4: // BOOL
-                column_offset += 0x1;
-                break;
-        }
-    }
-
-    if (column_index == -1) {
-        cerr << "Error: Column \"" << column << "\" not found in table." << endl;
-        return;
-    }
-
-    // Get column data type
-    uint8_t column_type = table_schema[column_index].id;
-
-    // Seek to the start of table data
-    uint32_t data_start_pos = table_schema_ptr + 1 + total_schema_bytes;
-    file.seekg(data_start_pos);
-
-    // Process each row
-    char flag;
-    bool condition_met;
-    int int_val, int_comp;
-    float float_val, float_comp;
-    char char_val, char_comp;
-    string str_val, str_comp;
-    bool bool_val, bool_comp;
-
-    // Convert comparison value based on column type
-    switch (column_type) {
-        case 0x0: // INT
-            int_comp = stoi(value);
-            break;
-        case 0x1: // FLOAT
-            float_comp = stof(value);
-            break;
-        case 0x2: // CHAR
-            char_comp = value[0];
-            break;
-        case 0x3: // STRING
-            str_comp = value;
-            break;
-        case 0x4: // BOOL
-            bool_comp = (value == "true" || value == "1");
-            break;
-    }
-
-    // Read through all records
-    while (file.read(&flag, 1)) {
-        uint32_t record_start = file.tellg() - 1;
-        
-        // Skip deleted records
-        if (flag == 0) {
-            file.seekg(record_start + 1 + total_schema_bytes);
-            continue;
-        }
-
-        // Move to the target column position
-        file.seekg(record_start + 1 + column_offset);
-        
-        // Read value and compare based on column type
-        condition_met = false;
-        
-        switch (column_type) {
-            case 0x0: // INT
-                file.read(reinterpret_cast<char*>(&int_val), sizeof(int_val));
-                if (op == "=") condition_met = (int_val == int_comp);
-                else if (op == "!=") condition_met = (int_val != int_comp);
-                else if (op == ">") condition_met = (int_val > int_comp);
-                else if (op == "<") condition_met = (int_val < int_comp);
-                else if (op == ">=") condition_met = (int_val >= int_comp);
-                else if (op == "<=") condition_met = (int_val <= int_comp);
-                break;
-                
-            case 0x1: // FLOAT
-                file.read(reinterpret_cast<char*>(&float_val), sizeof(float_val));
-                if (op == "=") condition_met = (float_val == float_comp);
-                else if (op == "!=") condition_met = (float_val != float_comp);
-                else if (op == ">") condition_met = (float_val > float_comp);
-                else if (op == "<") condition_met = (float_val < float_comp);
-                else if (op == ">=") condition_met = (float_val >= float_comp);
-                else if (op == "<=") condition_met = (float_val <= float_comp);
-                break;
-                
-            case 0x2: // CHAR
-                file.read(&char_val, 1);
-                if (op == "=") condition_met = (char_val == char_comp);
-                else if (op == "!=") condition_met = (char_val != char_comp);
-                else if (op == ">") condition_met = (char_val > char_comp);
-                else if (op == "<") condition_met = (char_val < char_comp);
-                else if (op == ">=") condition_met = (char_val >= char_comp);
-                else if (op == "<=") condition_met = (char_val <= char_comp);
-                break;
-                
-            case 0x3: // STRING
-                {
-                    char str_buffer[0xff] = {0};
-                    file.read(str_buffer, 0xff);
-                    str_val = str_buffer;
-                    
-                    if (op == "=") condition_met = (str_val == str_comp);
-                    else if (op == "!=") condition_met = (str_val != str_comp);
-                    else if (op == ">") condition_met = (str_val > str_comp);
-                    else if (op == "<") condition_met = (str_val < str_comp);
-                    else if (op == ">=") condition_met = (str_val >= str_comp);
-                    else if (op == "<=") condition_met = (str_val <= str_comp);
-                    else if (op == "LIKE") {
-                        // Simple pattern matching for LIKE operator
-                        // This is a basic implementation and might need to be expanded
-                        if (str_comp.front() == '%' && str_comp.back() == '%') {
-                            // %text%
-                            string pattern = str_comp.substr(1, str_comp.length() - 2);
-                            condition_met = (str_val.find(pattern) != string::npos);
-                        } else if (str_comp.front() == '%') {
-                            // %text
-                            string pattern = str_comp.substr(1);
-                            condition_met = (str_val.length() >= pattern.length() && 
-                                           str_val.substr(str_val.length() - pattern.length()) == pattern);
-                        } else if (str_comp.back() == '%') {
-                            // text%
-                            string pattern = str_comp.substr(0, str_comp.length() - 1);
-                            condition_met = (str_val.length() >= pattern.length() && 
-                                           str_val.substr(0, pattern.length()) == pattern);
-                        } else {
-                            // Exact match if no wildcard
-                            condition_met = (str_val == str_comp);
-                        }
-                    }
-                }
-                break;
-                
-            case 0x4: // BOOL
-                file.read(reinterpret_cast<char*>(&bool_val), 1);
-                if (op == "=") condition_met = (bool_val == bool_comp);
-                else if (op == "!=") condition_met = (bool_val != bool_comp);
-                break;
-        }
-        
-        // If condition is met, mark the record as deleted by setting flag to 0
-        if (condition_met) {
-            file.seekp(record_start);
-            flag = 0;
-            file.write(&flag, 1);
-        }
-        
-        // Move to the next record
-        file.seekg(record_start + 1 + total_schema_bytes);
+        response += "\n";
     }
 
     file.close();
+    return response;
+}
+
+string selectTable(const string& database_name, const string& table_name, const vector<string> columns) {
+    string response = "";
+
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return "Error: Could not open database file.";
+    }
+
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
+    }
+
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+
+    // Read schema
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+    
+    response += "Table: " + table_name + "\nSchema:\n";
+    
+    vector<int> selected_indices;
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        if (find(columns.begin(), columns.end(), table_schema[i].col_name) != columns.end()) {
+            selected_indices.push_back(i);
+            response += table_schema[i].col_name + "(" + datatypeIdToString(table_schema[i].id) + ")\n";
+        }
+    }
+
+    // Read table data
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    response += "\nData:\n";
+    for (const auto& row : table_data) {
+        for (int index : selected_indices) {  // Only process selected columns
+            const auto& cell = row[index];
+            switch (cell.id) {
+                case 0x0: // INT
+                    response += to_string(cell.int_data) + " ";
+                    break;
+                case 0x1: // FLOAT
+                    response += to_string(cell.float_data) + " ";
+                    break;
+                case 0x2: // CHAR
+                    response += cell.char_data + " ";
+                    break;
+                case 0x3: // STRING
+                    response += cell.string_data + " ";
+                    break;
+                case 0x4: // BOOL
+                    response += to_string(cell.bool_data) + " ";
+                    break;
+                default:
+                    return "INVALID";
+            }
+        }
+        response += "\n";
+    }
+
+    file.close();
+    return response;
+}
+
+string selectTableAllCond(const string& database_name, const string& table_name, const string column, const string oper, const string value) {
+    string response = "";
+
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return "Error: Could not open database file.";
+    }
+
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
+    }
+
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+
+    // Read schema
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+
+    response += "Table: " + table_name + "\nSchema:\n";
+    int condition_col_index = -1;
+    int condition_col_type = -1;
+
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        response += table_schema[i].col_name + "(" + datatypeIdToString(table_schema[i].id) + ")\n";
+        if (table_schema[i].col_name == column) {
+            condition_col_index = i;
+            condition_col_type = table_schema[i].id;
+        }
+    }
+
+    if (condition_col_index == -1) {
+        file.close();
+        return "Error: Specified column does not exist.";
+    }
+
+    // Read table data
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    response += "\nData:\n";
+    for (const auto& row : table_data) {
+        if (compare(column, oper, value, condition_col_type, row[condition_col_index])) {
+            for (const auto& cell : row) {
+                switch (cell.id) {
+                    case 0x0: // INT
+                        response += to_string(cell.int_data) + " ";
+                        break;
+                    case 0x1: // FLOAT
+                        response += to_string(cell.float_data) + " ";
+                        break;
+                    case 0x2: // CHAR
+                        response += cell.char_data + " ";
+                        break;
+                    case 0x3: // STRING
+                        response += cell.string_data + " ";
+                        break;
+                    case 0x4: // BOOL
+                        response += to_string(cell.bool_data) + " ";
+                        break;
+                    default:
+                        return "INVALID";
+                }
+            }
+            response += "\n";
+        }
+    }
+
+    file.close();
+    return response;
+}
+
+string selectTableCond(const string& database_name, const string& table_name, const vector<string>& columns, const string& column, const string& oper, const string& value) {
+    string response = "";
+
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return "Error: Could not open database file.";
+    }
+
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
+    }
+
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+
+    // Read schema
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+
+    response += "Table: " + table_name + "\nSchema:\n";
+
+    // Find the indexes of selected columns
+    vector<int> selected_indices;
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        if (find(columns.begin(), columns.end(), table_schema[i].col_name) != columns.end()) {
+            selected_indices.push_back(i);
+            response += table_schema[i].col_name + "(" + datatypeIdToString(table_schema[i].id) + ")\n";
+        }
+    }
+
+    // Find the index and type of the column used in WHERE condition
+    int condition_col_index = -1;
+    int condition_col_type = -1;
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        if (table_schema[i].col_name == column) {
+            condition_col_index = i;
+            condition_col_type = table_schema[i].id;
+            break;
+        }
+    }
+
+    if (condition_col_index == -1) {
+        file.close();
+        return "Error: Specified column does not exist.";
+    }
+
+    // Read table data
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    response += "\nData:\n";
+    for (const auto& row : table_data) {
+        if (compare(column, oper, value, condition_col_type, row[condition_col_index])) {
+            for (int index : selected_indices) {  // Print only selected columns
+                const auto& cell = row[index];
+                switch (cell.id) {
+                    case 0x0: // INT
+                        response += to_string(cell.int_data) + " ";
+                        break;
+                    case 0x1: // FLOAT
+                        response += to_string(cell.float_data) + " ";
+                        break;
+                    case 0x2: // CHAR
+                        response += cell.char_data + " ";
+                        break;
+                    case 0x3: // STRING
+                        response += cell.string_data + " ";
+                        break;
+                    case 0x4: // BOOL
+                        response += to_string(cell.bool_data) + " ";
+                        break;
+                    default:
+                        return "INVALID";
+                }
+            }
+            response += "\n";
+        }
+    }
+
+    file.close();
+    return response;
 }
 
 int useDatabase(const string& database_name) {
@@ -468,3 +646,119 @@ void dropTable(const string& database_name, const string& table_name) {
 
     file.close();
 }
+
+string updateTableCond(const string& database_name, const string& table_name, const string& column_name, const string& value, const string& condition_column, const string& oper, const string& condition_value) {
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return "Error: Could not open database file.";
+    }
+
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
+    }
+
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+
+    // Read schema
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+
+    int condition_col_index = -1, update_col_index = -1;
+    int condition_col_type = -1;
+
+    // Find indexes of columns
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        if (table_schema[i].col_name == condition_column) {
+            condition_col_index = i;
+            condition_col_type = table_schema[i].id;
+        }
+        if (table_schema[i].col_name == column_name) {
+            update_col_index = i;
+        }
+    }
+
+    if (condition_col_index == -1 || update_col_index == -1) {
+        file.close();
+        return "Error: Column not found.";
+    }
+
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    for (auto& row : table_data) {
+        if (compare(condition_column, oper, condition_value, condition_col_type, row[condition_col_index])) {
+            switch (row[update_col_index].id) {
+                case 0x0: row[update_col_index].int_data = stoi(value); break;
+                case 0x1: row[update_col_index].float_data = stod(value); break;
+                case 0x2: row[update_col_index].char_data = value[0]; break;
+                case 0x3: row[update_col_index].string_data = value; break;
+                case 0x4: row[update_col_index].bool_data = (value == "true"); break;
+                default: return "Error: Invalid data type.";
+            }
+        }
+    }
+
+    writeTableData(file, table_schema_ptr + 1 + (1 + 256) * table_schema.size(), table_data);
+    file.close();
+    return "Update successful.";
+}
+
+string updateTable(const string& database_name, const string& table_name, const string& column_name, const string& value) {
+    fstream file(database_name + ".fdb", ios::in | ios::out | ios::binary);
+    if (!file) {
+        cerr << "Error: Could not open database file." << endl;
+        return "Error: Could not open database file.";
+    }
+
+    cout << "test: " << table_name << "\n";
+    int pointer_ptr = findTableIndex(file, table_name);
+    if (pointer_ptr == -1) {
+        cerr << "Error: Table \"" << table_name << "\" doesn't exist." << endl;
+        return "Error: Table doesn't exist.";
+    }
+
+    auto [_, table_schema_ptr] = readPointers(file, pointer_ptr);
+
+    // Read schema
+    vector<struct_col_dtype> table_schema = readTableSchema(file, table_schema_ptr);
+
+    int update_col_index = -1;
+    for (size_t i = 0; i < table_schema.size(); ++i) {
+        if (table_schema[i].col_name == column_name) {
+            update_col_index = i;
+            break;
+        }
+    }
+
+    if (update_col_index == -1) {
+        file.close();
+        return "Error: Column not found.";
+    }
+
+    vector<vector<struct_name_id_data>> table_data = readTableData(
+        file, 
+        table_schema_ptr + 1 + (1 + 256) * table_schema.size(), 
+        table_schema
+    );
+
+    for (auto& row : table_data) {
+        switch (row[update_col_index].id) {
+            case 0x0: row[update_col_index].int_data = stoi(value); break;
+            case 0x1: row[update_col_index].float_data = stod(value); break;
+            case 0x2: row[update_col_index].char_data = value[0]; break;
+            case 0x3: row[update_col_index].string_data = value; break;
+            case 0x4: row[update_col_index].bool_data = (value == "true"); break;
+            default: return "Error: Invalid data type.";
+        }
+    }
+
+    writeTableData(file, table_schema_ptr + 1 + (1 + 256) * table_schema.size(), table_data);
+    file.close();
+    return "Update successful.";
+}
+

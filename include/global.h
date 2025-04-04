@@ -20,7 +20,7 @@ struct struct_name_id_data {
 	int id;
 
 	int int_data;
-	float float_data;
+	double float_data;
 	char char_data;
 	string string_data;
 	bool bool_data;
@@ -44,5 +44,11 @@ vector<struct_col_dtype> typeNameToId(const vector<struct_column_datatype> &tabl
 int totalSchemaBytes(const vector<struct_col_dtype>& table_schema);
 
 vector<struct_name_id_data> schemaToValue(const vector<struct_col_dtype>& table_schema, const vector<string>& values);
+
+int columnSize(int id);
+
+string datatypeIdToString(int id);
+
+bool compare(const string& column, const string& oper, const string& value, int dataTypeId, const struct_name_id_data& data);
 
 #endif

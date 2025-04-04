@@ -16,6 +16,15 @@ struct struct_column_datatype {
 	string type;
 };
 
+struct struct_select {
+    vector<string> columns;
+    string table_name;
+    bool has_condition = false;
+    string condition_column;
+    string condition_operator;
+    string condition_value;
+};
+
 struct struct_insert {
     string table_name;
     vector<string> values;
@@ -53,6 +62,8 @@ int parse_command(const string& str);
 vector<string> parse_SELECT_column_list(const string& sql);
 string parse_SELECT_table(const string& sql);
 struct struct_condition parse_SELECT_condition(const string& sql);
+
+struct_select parse_SELECT(const string& sql);
 
 string parse_CREATE_option(const string& sql);
 string parse_CREATE_name(const string& sql);
